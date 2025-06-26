@@ -31,7 +31,18 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
 
 # typescript
 *.tsbuildinfo
+
+# Editor/OS
+.vscode/
+Thumbs.db
+
+# Environment variables
+.env
+
+android/
+ios/
