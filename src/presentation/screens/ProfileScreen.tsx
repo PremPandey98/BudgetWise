@@ -1,57 +1,308 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, ScrollView, Modal, TextInput, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_CONFIG } from '../../core/config/constants';
 import { Ionicons, MaterialIcons, FontAwesome } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import CustomPopup from '../components/CustomPopup';
-import { userAPI } from '../../data/services/api';
+import { userAPI, groupAPI } from '../../data/services/api';
+import { TokenManager } from '../../data/TokenManager';
+import ContextIndicator from '../components/ContextIndicator';
 
 export default function ProfileScreen() {
   const [user, setUser] = useState({ name: '', email: '' });
   const [logoutPopup, setLogoutPopup] = useState(false);
+  const [groupExpanded, setGroupExpanded] = useState(false);
+  const [userGroups, setUserGroups] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [activeGroup, setActiveGroup] = useState<any>(null); // null means "Personal"
+  const [joinGroupModal, setJoinGroupModal] = useState(false);
+  const [groupCode, setGroupCode] = useState('');
+  const [groupPassword, setGroupPassword] = useState('');
+  const [joinLoading, setJoinLoading] = useState(false);
   const navigation = useNavigation();
+  const groupPasswordInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const userData = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER_DATA);
-        if (userData) {
-          const parsed = JSON.parse(userData);
-          setUser({
-            name: parsed.name || parsed.userName || 'User',
-            email: parsed.email || '',
-          });
-        }
-      } catch {}
-    };
     fetchUser();
   }, []);
 
-  const handleLogout = async () => {
-    setLogoutPopup(false);
+  // Function to load active group from storage
+  const loadActiveGroup = async () => {
     try {
-      // Get token from AsyncStorage
+      const activeGroupData = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.ACTIVE_GROUP);
+      if (activeGroupData) {
+        const group = JSON.parse(activeGroupData);
+        setActiveGroup(group);
+        console.log('✅ Active group loaded:', group);
+      } else {
+        setActiveGroup(null); // Personal mode
+        console.log('ℹ️ No active group, using Personal mode');
+      }
+    } catch (error) {
+      console.log('❌ Error loading active group:', error);
+      setActiveGroup(null);
+    }
+  };
+
+  // Function to set active group with token switching
+  const setActiveGroupAndSave = async (group: any) => {
+    try {
+      if (group) {
+        // Switch to group context and get group-specific token
+        const success = await TokenManager.switchToGroup(group);
+        if (success) {
+          setActiveGroup(group);
+          console.log('✅ Active group set with token context:', group.groupName);
+        } else {
+          throw new Error('Failed to switch to group context');
+        }
+      } else {
+        // Switch back to personal context
+        const success = await TokenManager.switchToPersonal();
+        if (success) {
+          setActiveGroup(null);
+          console.log('✅ Switched to Personal mode');
+        } else {
+          throw new Error('Failed to switch to personal context');
+        }
+      }
+    } catch (error) {
+      console.log('❌ Error setting active group:', error);
+      Alert.alert('Error', 'Failed to switch context. Please try again.');
+    }
+  };
+
+  // Function to load groups from cache
+  const loadGroupsFromCache = async () => {
+    try {
+      const cachedGroups = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER_GROUPS);
+      if (cachedGroups) {
+        const groups = JSON.parse(cachedGroups);
+        setUserGroups(groups);
+        console.log('✅ Groups loaded from cache:', groups);
+      } else {
+        setUserGroups([]);
+        console.log('ℹ️ No cached groups found');
+      }
+    } catch (error) {
+      console.log('❌ Error loading groups from cache:', error);
+      setUserGroups([]);
+    }
+  };
+
+  // Function to refresh groups from API (when needed)
+  const refreshGroupsFromAPI = async () => {
+    setLoading(true);
+    try {
       const userData = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER_DATA);
-      let token = '';
       if (userData) {
         const parsed = JSON.parse(userData);
-        token = parsed.token || '';
+        const token = parsed.token;
+        
+        if (token) {
+          console.log('� Refreshing groups from API...');
+          const userDetails = await userAPI.getUserDetails(token);
+          const groups = userDetails.groups?.$values || [];
+          
+          // Update cache
+          await AsyncStorage.setItem(APP_CONFIG.STORAGE_KEYS.USER_GROUPS, JSON.stringify(groups));
+          setUserGroups(groups);
+          console.log('✅ Groups refreshed and cached:', groups);
+        }
       }
-      if (token) {
-        await userAPI.logout(token);
+    } catch (error) {
+      console.log('❌ Error refreshing groups:', error);
+      // Keep existing cached groups on error
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load groups and active group when component mounts
+  useEffect(() => {
+    loadGroupsFromCache();
+    loadActiveGroup();
+  }, []);
+
+  // Refresh groups and active group when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadGroupsFromCache();
+      loadActiveGroup();
+      // Refresh user data when coming back from edit profile
+      fetchUser();
+    }, [])
+  );
+
+  const fetchUser = async () => {
+    try {
+      const userData = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER_DATA);
+      if (userData) {
+        const parsed = JSON.parse(userData);
+        setUser({
+          name: parsed.name || parsed.userName || 'User',
+          email: parsed.email || '',
+        });
+      }
+    } catch (error) {
+      console.log('Error fetching user:', error);
+    }
+  };
+
+  // Load groups when group section is expanded (from cache, no API call)
+  useEffect(() => {
+    if (groupExpanded && userGroups.length === 0) {
+      loadGroupsFromCache();
+    }
+  }, [groupExpanded]);
+
+  const handleLogout = async () => {
+    setLogoutPopup(false);
+    console.log('🚪 Starting logout process...');
+    
+    try {
+      // Get current token (could be personal or group token)
+      const currentToken = await TokenManager.getCurrentToken();
+      if (currentToken) {
+        await userAPI.logout(currentToken);
+        console.log('✅ Logout API call successful');
       }
     } catch (e) {
-      // Optionally handle error
+      console.log('⚠️ Logout API error (continuing anyway):', e);
     }
-    await AsyncStorage.removeItem(APP_CONFIG.STORAGE_KEYS.USER_DATA);
-    // Ensure navigation goes to the root HomeScreen, not the tabbed dashboard
-    navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Home' }] });
+    
+    // Clear all tokens and data using TokenManager
+    await TokenManager.clearAllTokens();
+    await AsyncStorage.removeItem(APP_CONFIG.STORAGE_KEYS.USER_GROUPS);
+    await AsyncStorage.removeItem(APP_CONFIG.STORAGE_KEYS.APP_SETTINGS);
+    
+    // Set navigation trigger to force AppNavigator to detect logout
+    await AsyncStorage.setItem('@budgetwise_navigation_trigger', Date.now().toString());
+    
+    console.log('🧹 All data cleared from storage');
+    console.log('🔄 AppNavigator will detect logout and switch to auth screens');
+  };
+
+  const closeJoinGroupModal = () => {
+    setJoinGroupModal(false);
+    setGroupCode('');
+    setGroupPassword('');
+  };
+  const handleJoinGroup = async () => {
+    setJoinLoading(true);
+    try {
+      // Basic validation
+      if (!groupCode.trim()) {
+        return Alert.alert('Validation Error', 'Group code is required');
+      }
+      
+      // Get user token
+      const userData = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER_DATA);
+      if (!userData) {
+        return Alert.alert('Error', 'User not logged in');
+      }
+      
+      const parsed = JSON.parse(userData);
+      const token = parsed.token;
+      
+      if (!token) {
+        return Alert.alert('Error', 'Authentication token not found');
+      }
+      
+      // Join group API call using addUserToGroup
+      const groupData = {
+        groupCode: groupCode.trim(),
+        Password: groupPassword.trim() || null
+      };
+      const response = await groupAPI.addUserToGroup(groupData, token);
+      console.log('✅ Joined group:', response);
+      
+      // Refresh groups to get updated list
+      await refreshGroupsFromAPI();
+      
+      // Close modal and clear form
+      closeJoinGroupModal();
+      
+      Alert.alert('Success', 'You have joined the group successfully');
+    } catch (error: any) {
+      console.log('❌ Error joining group:', error);
+      let errorMessage = 'Failed to join the group. Please try again.';
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setJoinLoading(false);
+    }
+  };
+
+  const handleRemoveFromGroup = async (group: any) => {
+    Alert.alert(
+      'Remove from Group',
+      `Are you sure you want to leave "${group.groupName}"?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Get user data
+              const userData = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER_DATA);
+              if (!userData) {
+                return Alert.alert('Error', 'User not logged in');
+              }
+              
+              const parsed = JSON.parse(userData);
+              const token = parsed.token;
+              const userId = parsed.userId;
+              
+              if (!token || !userId) {
+                return Alert.alert('Error', 'User authentication data not found');
+              }
+              
+              // Call remove API
+              await groupAPI.removeUserFromGroup(userId, group.id, token);
+              console.log('✅ Removed from group:', group.groupName);
+              
+              // If the removed group was active, switch to Personal
+              if (activeGroup && activeGroup.id === group.id) {
+                await setActiveGroupAndSave(null);
+              }
+              
+              // Refresh groups
+              await refreshGroupsFromAPI();
+              
+              Alert.alert('Success', `You have been removed from "${group.groupName}"`);
+            } catch (error: any) {
+              console.log('❌ Error removing from group:', error);
+              let errorMessage = 'Failed to remove from group. Please try again.';
+              if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
+              } else if (error.message) {
+                errorMessage = error.message;
+              }
+              Alert.alert('Error', errorMessage);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <Text style={styles.profileTitle}>Profile</Text>
+      
+      {/* Context Indicator */}
+      <ContextIndicator />
+      
       <View style={styles.avatarContainer}>
         <Image
           source={require('../../../assets/icon.png')}
@@ -61,14 +312,161 @@ export default function ProfileScreen() {
       <Text style={styles.name}>{user.name}</Text>
       <Text style={styles.email}>{user.email}</Text>
       <View style={styles.menuList}>
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('EditProfile' as never)}>
           <View style={[styles.menuIcon, { backgroundColor: '#6C63FF' }]}>  
             <Ionicons name="person-outline" size={22} color="#fff" />
           </View>
           <Text style={styles.menuText}>Edit Profile</Text>
           <Ionicons name="chevron-forward" size={22} color="#B0B0B0" style={styles.menuArrow} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => setGroupExpanded(!groupExpanded)}>
+          <View style={[styles.menuIcon, { backgroundColor: '#FF9500' }]}>  
+            <Ionicons name="people-outline" size={22} color="#fff" />
+          </View>
+          <Text style={styles.menuText}>Group</Text>
+          <Ionicons 
+            name={groupExpanded ? "chevron-down" : "chevron-forward"} 
+            size={22} 
+            color="#B0B0B0" 
+            style={styles.menuArrow} 
+          />
+        </TouchableOpacity>
+        {groupExpanded && (
+          <View style={styles.groupContent}>
+            <View style={styles.groupDemo}>
+              <View style={styles.groupHeader}>
+                <Text style={styles.groupTitle}>Active Group</Text>
+                <TouchableOpacity 
+                  style={styles.refreshButton} 
+                  onPress={refreshGroupsFromAPI}
+                  disabled={loading}
+                >
+                  <Ionicons 
+                    name="refresh" 
+                    size={20} 
+                    color={loading ? "#B0B0B0" : "#FF9500"} 
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* Current Active Group Display */}
+              <View style={styles.activeGroupContainer}>
+                <Text style={styles.activeGroupLabel}>Currently Active:</Text>
+                <View style={[styles.groupItem, styles.activeGroupItem]}>
+                  <View style={[styles.groupAvatar, activeGroup ? {} : styles.personalAvatar]}>
+                    <Ionicons 
+                      name={activeGroup ? "people" : "person"} 
+                      size={20} 
+                      color={activeGroup ? "#FF9500" : "#4A90E2"} 
+                    />
+                  </View>
+                  <View style={styles.groupInfo}>
+                    <Text style={styles.groupName}>
+                      {activeGroup ? activeGroup.groupName : "Personal"}
+                    </Text>
+                    <Text style={styles.groupMembers}>
+                      {activeGroup 
+                        ? `Code: ${activeGroup.groupCode}` 
+                        : "Your individual expenses"
+                      }
+                    </Text>
+                  </View>
+                  <View style={styles.activeIndicator}>
+                    <Ionicons name="checkmark-circle" size={24} color="#00C897" />
+                  </View>
+                </View>
+              </View>
+
+              {/* Group Selection */}
+              <Text style={styles.selectionTitle}>Switch to:</Text>
+              
+              {/* Personal Option */}
+              {activeGroup && (
+                <View style={styles.groupItem}>
+                  <View style={[styles.groupAvatar, styles.personalAvatar]}>
+                    <Ionicons name="person" size={20} color="#4A90E2" />
+                  </View>
+                  <View style={styles.groupInfo}>
+                    <Text style={styles.groupName}>Personal</Text>
+                    <Text style={styles.groupMembers}>Your individual expenses</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.selectButton}
+                    onPress={() => setActiveGroupAndSave(null)}
+                  >
+                    <Text style={styles.selectButtonText}>Select</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Available Groups */}
+              {loading ? (
+                <View style={styles.loadingContainer}>
+                  <Text style={styles.loadingText}>Loading groups...</Text>
+                </View>
+              ) : userGroups.length > 0 ? (
+                userGroups
+                  .filter((group: any) => !activeGroup || group.id !== activeGroup.id)
+                  .map((group: any, index: number) => (
+                    <View 
+                      key={group.id || index} 
+                      style={styles.groupItem}
+                    >
+                      <View style={styles.groupAvatar}>
+                        <Ionicons name="people" size={20} color="#FF9500" />
+                      </View>
+                      <View style={styles.groupInfo}>
+                        <Text style={styles.groupName}>
+                          {group.groupName || `Group ${index + 1}`}
+                        </Text>
+                        <Text style={styles.groupMembers}>
+                          Code: {group.groupCode || 'N/A'}
+                        </Text>
+                        {group.description && (
+                          <Text style={styles.groupDescription}>
+                            {group.description}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.groupButtonsContainer}>
+                        <TouchableOpacity 
+                          style={styles.selectButton}
+                          onPress={() => setActiveGroupAndSave(group)}
+                        >
+                          <Text style={styles.selectButtonText}>Select</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={styles.removeButton}
+                          onPress={() => handleRemoveFromGroup(group)}
+                        >
+                          <Ionicons name="trash-outline" size={16} color="#FF4C5E" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))
+              ) : (
+                <View style={styles.noGroupsContainer}>
+                  <Ionicons name="people-outline" size={40} color="#B0B0B0" />
+                  <Text style={styles.noGroupsText}>No groups found</Text>
+                  <Text style={styles.noGroupsSubtext}>Create a group to get started</Text>
+                </View>
+              )}
+
+              <View style={styles.groupActions}>
+                <TouchableOpacity style={styles.createGroupButton} onPress={() => navigation.navigate('CreateGroup' as never)}>
+                  <Ionicons name="add-circle" size={20} color="#FF9500" />
+                  <Text style={styles.createGroupText}>Create New Group</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity style={styles.joinGroupButton} onPress={() => setJoinGroupModal(true)}>
+                  <Ionicons name="enter-outline" size={20} color="#4A90E2" />
+                  <Text style={styles.joinGroupText}>Join Group</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
+        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Settings' as never)}>
           <View style={[styles.menuIcon, { backgroundColor: '#00C897' }]}>  
             <Ionicons name="settings-outline" size={22} color="#fff" />
           </View>
@@ -90,6 +488,73 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={22} color="#B0B0B0" style={styles.menuArrow} />
         </TouchableOpacity>
       </View>
+
+      
+      {/* Join Group Modal */}
+      <Modal
+        visible={joinGroupModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeJoinGroupModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.joinModalCard}>
+            <View style={styles.joinModalHeader}>
+              <Ionicons name="enter-outline" size={32} color="#4A90E2" style={{marginBottom: 8}} />
+              <Text style={styles.joinModalTitle}>Join Existing Group</Text>
+              <Text style={styles.joinModalSubtitle}>Enter the group code and password to join a group</Text>
+            </View>
+            <View style={styles.modalInputContainer}>
+              <Text style={styles.modalInputLabel}>Group Code</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Enter group code"
+                placeholderTextColor="#B0B0B0"
+                value={groupCode}
+                onChangeText={setGroupCode}
+                autoCapitalize="none"
+                returnKeyType="next"
+                onSubmitEditing={() => groupPasswordInputRef.current?.focus()}
+              />
+            </View>
+            <View style={styles.modalInputContainer}>
+              <Text style={styles.modalInputLabel}>Password <Text style={{color:'#B0B0B0',fontWeight:'400'}}>(Optional)</Text></Text>
+              <TextInput
+                ref={groupPasswordInputRef}
+                style={styles.modalInput}
+                placeholder="Enter password if required"
+                placeholderTextColor="#B0B0B0"
+                value={groupPassword}
+                onChangeText={setGroupPassword}
+                secureTextEntry
+                returnKeyType="done"
+                onSubmitEditing={handleJoinGroup}
+              />
+            </View>
+            <View style={styles.joinModalButtons}>
+              <TouchableOpacity
+                style={[styles.joinModalButton, { backgroundColor: '#4A90E2' }]}
+                onPress={handleJoinGroup}
+                disabled={joinLoading}
+              >
+                {joinLoading ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.joinModalButtonText}>Join Group</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.joinModalButton, { backgroundColor: '#B0B0B0' }]}
+                onPress={closeJoinGroupModal}
+                disabled={joinLoading}
+              >
+                <Text style={styles.joinModalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <CustomPopup
         visible={logoutPopup}
         message="Are you sure you want to logout?"
@@ -97,7 +562,7 @@ export default function ProfileScreen() {
         onClose={() => setLogoutPopup(false)}
         onConfirm={handleLogout}
       />
-    </View>
+    </ScrollView>
   );
 }
 
@@ -105,8 +570,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F0F8FF', // Light blue background
+  },
+  scrollContent: {
     alignItems: 'center',
     paddingTop: 40,
+    paddingBottom: 30,
   },
   profileTitle: {
     color: '#2C5282', // Dark blue text
@@ -173,5 +641,313 @@ const styles = StyleSheet.create({
   },
   menuArrow: {
     marginLeft: 8,
+  },
+  groupContent: {
+    marginBottom: 14,
+  },
+  groupDemo: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#4A90E2',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  groupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  groupTitle: {
+    color: '#2C5282',
+    fontSize: 18,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+  refreshButton: {
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: '#FFF5E6',
+  },
+  groupItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F8FF',
+  },
+  groupAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFF5E6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  groupInfo: {
+    flex: 1,
+  },
+  groupName: {
+    color: '#2C5282',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  groupMembers: {
+    color: '#4A90E2',
+    fontSize: 14,
+    marginTop: 2,
+  },
+  groupDescription: {
+    color: '#6B7280',
+    fontSize: 12,
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+  groupAction: {
+    backgroundColor: '#FF9500',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  groupActionText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  activeGroupContainer: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#00C897',
+  },
+  activeGroupLabel: {
+    color: '#00C897',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  activeGroupItem: {
+    borderBottomWidth: 0,
+    paddingVertical: 8,
+  },
+  personalAvatar: {
+    backgroundColor: '#E6F3FF',
+  },
+  activeIndicator: {
+    marginLeft: 8,
+  },
+  selectionTitle: {
+    color: '#2C5282',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  selectButton: {
+    backgroundColor: '#4A90E2',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  selectButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  groupButtonsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  removeButton: {
+    backgroundColor: '#FFE6E6',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginLeft: 4,
+  },
+  createGroupButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    backgroundColor: '#FFF5E6',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FF9500',
+  },
+  createGroupText: {
+    color: '#FF9500',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  loadingContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#4A90E2',
+    fontSize: 16,
+  },
+  noGroupsContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  noGroupsText: {
+    color: '#2C5282',
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  noGroupsSubtext: {
+    color: '#4A90E2',
+    fontSize: 14,
+    marginTop: 4,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  modalContent: {
+    width: '80%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  modalTitle: {
+    color: '#2C5282',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  modalInput: {
+    height: 48,
+    borderColor: '#D1D5DB',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+    fontSize: 16,
+    color: '#2C5282',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalButton: {
+    flex: 1,
+    borderRadius: 8,
+    paddingVertical: 12,
+    marginHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  groupActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  joinGroupButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
+    paddingVertical: 12,
+    backgroundColor: '#E6F3FF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#4A90E2',
+  },
+  joinGroupText: {
+    color: '#4A90E2',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  joinModalCard: {
+    width: '90%',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 28,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 8,
+    alignItems: 'stretch',
+  },
+  joinModalHeader: {
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  joinModalTitle: {
+    color: '#2C5282',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  joinModalSubtitle: {
+    color: '#4A90E2',
+    fontSize: 14,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  modalInputContainer: {
+    marginBottom: 16,
+  },
+  modalInputLabel: {
+    color: '#2C5282',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  joinModalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 18,
+  },
+  joinModalButton: {
+    flex: 1,
+    borderRadius: 8,
+    paddingVertical: 14,
+    marginHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  joinModalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

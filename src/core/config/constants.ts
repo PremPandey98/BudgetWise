@@ -32,7 +32,7 @@ function getDevBaseUrl(): string {
   } else {
     // For Physical Device: use your computer's IP address
     // Android/iOS physical devices cannot access localhost - need your computer's IP
-    baseIP = '192.168.1.238'; // Your computer's actual IP address
+    baseIP = '192.168.1.236'; // Your computer's actual IP address
   }
   
   return `http://${baseIP}:5091`;
@@ -45,13 +45,41 @@ export const API_ENDPOINTS = {
     REGISTER: '/api/User/AddUser',        // Updated to match your backend controller
     LOGOUT: '/api/Auth/logout',           // Your existing endpoint
     REFRESH: '/api/Auth/refresh',
+    SWITCH_TO_GROUP: '/api/auth/switchTogroup', // Endpoint for switching to group context
   },
   USER: {
     ADD_USER: '/api/User/AddUser',        // Your existing User endpoint
     PROFILE: '/api/User/profile',
     UPDATE: '/api/User/update',
+    ME: '/api/user/me',                   // New endpoint for user details with groups
+    UPDATE_USER_GROUPS: '/api/user/UpdateUserGroups', // Endpoint for adding user to group
+    REMOVE_USER_GROUP: '/api/user/RemoveUserGroup', // Endpoint for removing user from group
+  },
+  GROUP: {
+    ADD_GROUP: '/api/Group/AddGroup',     // Endpoint for creating new group
+  },
+  EXPENSE: {
+    ADD_EXPENSE_RECORD: '/api/ExpenseRecords/AddExpenseRecord',  // Endpoint for adding expense records
+    GET_CATEGORIES: '/api/ExpenseCategory/',  // Endpoint for fetching expense categories
+    GET_ALL_EXPENSE_RECORDS: '/api/ExpenseRecords/GetAllExpenseRecord',  // Endpoint for fetching all expense records
+    GET_ALL_RELATED_EXPENSE_RECORDS: '/api/ExpenseRecords/GetAllRelatedExpenseRecord', // Context-aware endpoint (personal/group)
   },
 };
+
+// Expense categories mapping
+export const EXPENSE_CATEGORIES = {
+  'Food & Dining': 1,
+  'Transportation': 2,
+  'Shopping': 3,
+  'Entertainment': 4,
+  'Bills & Utilities': 5,
+  'Healthcare': 6,
+  'Education': 7,
+  'Travel': 8,
+  'Groceries': 9,
+  'Gas': 10,
+  'Other': 11,
+} as const;
 
 // App Configuration
 export const APP_CONFIG = {
@@ -59,6 +87,12 @@ export const APP_CONFIG = {
     USER_DATA: '@budgetwise_user',
     AUTH_TOKEN: '@budgetwise_token',
     REFRESH_TOKEN: '@budgetwise_refresh_token',
+    USER_GROUPS: '@budgetwise_user_groups',    // New key for storing user groups
+    ACTIVE_GROUP: '@budgetwise_active_group',  // New key for storing selected group
+    PERSONAL_EXPENSES: '@budgetwise_personal_expenses',   // Key for personal expenses
+    GROUP_EXPENSES_PREFIX: '@budgetwise_group_expenses_', // Prefix for group expenses
+    APP_SETTINGS: '@budgetwise_app_settings',  // Key for app settings
+    CONTEXT_TOKEN: '@budgetwise_context_token', // Key for storing context-aware token (personal/group)
   },
 };
 

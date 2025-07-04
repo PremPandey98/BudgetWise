@@ -31,10 +31,8 @@ export default function LoginScreen({ navigation }: Props) {
   const closePopup = () => {
     const currentType = popup.type;
     setPopup(p => ({ ...p, visible: false }));
-    // Navigate to Dashboard only after closing success popup
-    if (currentType === 'success') {
-      navigation.navigate('Dashboard');
-    }
+    // AppNavigator will automatically detect login and switch to MainTabs
+    // No manual navigation needed for success popup
   };
 
   const handleLogin = async () => {
@@ -51,6 +49,7 @@ export default function LoginScreen({ navigation }: Props) {
       // Call API service
       const loginResponse: LoginResponse = await userAPI.login(credentials);
       console.log('Login Response:', loginResponse);
+      
       // Save user data to AsyncStorage for dashboard
       await AsyncStorage.setItem(
         APP_CONFIG.STORAGE_KEYS.USER_DATA,
@@ -62,10 +61,48 @@ export default function LoginScreen({ navigation }: Props) {
           token: loginResponse.token
         })
       );
+      
+      // Ensure the data is written before showing success message
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Fetch and store user groups immediately after login
+      try {
+        console.log('🔍 Fetching user groups after login...');
+        const userDetails = await userAPI.getUserDetails(loginResponse.token);
+        const groups = userDetails.groups?.$values || [];
+        
+        // Store groups in AsyncStorage
+        await AsyncStorage.setItem(
+          APP_CONFIG.STORAGE_KEYS.USER_GROUPS,
+          JSON.stringify(groups)
+        );
+        console.log('✅ Groups stored successfully:', groups);
+        
+        // Ensure the data is written
+        await new Promise(resolve => setTimeout(resolve, 50));
+      } catch (groupError) {
+        console.log('⚠️ Failed to fetch groups on login:', groupError);
+        // Don't fail login if groups fetch fails, just store empty array
+        await AsyncStorage.setItem(APP_CONFIG.STORAGE_KEYS.USER_GROUPS, JSON.stringify([]));
+        // Ensure the data is written
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+
       setToast({ visible: true, message: `Welcome back, ${loginResponse.userName}!`, type: 'success' });
+      
+      // Force navigation to main app after successful login
       setTimeout(() => {
-        navigation.navigate('MainTabs');
         setToast(t => ({ ...t, visible: false }));
+        console.log('🔄 Login successful - user data stored');
+        console.log('✅ AppNavigator should automatically detect login and redirect');
+        
+        // Trigger a manual state check in the AppNavigator by updating the AsyncStorage
+        // and then letting the AppNavigator's effect detect the change
+        const triggerNavigation = async () => {
+          // Force re-read by setting a navigation trigger
+          await AsyncStorage.setItem('@budgetwise_navigation_trigger', Date.now().toString());
+        };
+        triggerNavigation();
       }, 1000);
     } catch (error: any) {
       console.log('Login error:', error);
