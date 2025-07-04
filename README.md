@@ -24,6 +24,7 @@ A modern, cross-platform budgeting app built with React Native and Expo.
    npm start
    # or
    expo start
+   # npx expo start
    ```
 4. **Run on your device:**
    - Use the Expo Go app (Android/iOS) to scan the QR code.
