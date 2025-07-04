@@ -19,16 +19,22 @@ A modern, cross-platform budgeting app built with React Native and Expo.
    ```sh
    npm install
    ```
-3. **Start the development server:**
+   first need to check your ip address of your pc and 
+   need to change you local pc ip address add in #constants.ts
+
+   like this :  baseIP = '192.168.1.236';
+4. **Start the development server:**
    ```sh
    npm start
    # or
    expo start
    # npx expo start
    ```
-4. **Run on your device:**
+5. **Run on your device:**
    - Use the Expo Go app (Android/iOS) to scan the QR code.
    - Or run on an emulator/simulator from the Expo Dev Tools.
+  
+   - if any facing problem of reflect on mobile so reload the app by pressing "R" key of you keyboard
 
 ### Environment Variables
 - If your project uses environment variables, create a `.env` file in the root directory. This file is ignored by git.
