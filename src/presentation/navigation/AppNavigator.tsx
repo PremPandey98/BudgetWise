@@ -5,6 +5,8 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import { APP_CONFIG } from '../../core/config/constants';
+import SplashScreen from '../screens/SplashScreen';
+import AppLoadingScreen from '../screens/AppLoadingScreen';
 import HomeScreen from '../screens/HomeScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
@@ -13,6 +15,7 @@ import CreateGroupScreen from '../screens/CreateGroupScreen';
 import AddExpenseScreen from '../screens/AddExpenseScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import ViewGroupScreen from '../screens/ViewGroupScreen';
 import MainTabNavigator from './MainTabNavigator';
 
 export type RootStackParamList = {
@@ -25,18 +28,32 @@ export type RootStackParamList = {
   AddExpense: undefined;
   EditProfile: undefined;
   Settings: undefined;
+  ViewGroup: {
+    group: {
+      id: string;
+      groupName: string;
+      groupCode: string;
+      description?: string;
+      createdAt?: string;
+      memberCount?: number;
+    };
+  };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function AppNavigator() {
   const [isLoading, setIsLoading] = useState(true);
+  const [showSplash, setShowSplash] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const checkLoginStatus = useCallback(async () => {
     try {
       const userData = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER_DATA);
       const loggedIn = !!userData;
+      
+      // Simulate some loading time for better UX
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Always update state to force re-render
       setIsLoggedIn(loggedIn);
@@ -51,7 +68,15 @@ export default function AppNavigator() {
     }
   }, []);
 
+  const handleSplashComplete = () => {
+    setShowSplash(false);
+    checkLoginStatus();
+  };
+
   useEffect(() => {
+    // Don't start checking login until splash is complete
+    if (showSplash) return;
+    
     checkLoginStatus();
     
     // Add a more frequent check during the first few seconds after component mount
@@ -73,7 +98,7 @@ export default function AppNavigator() {
       clearInterval(intervalId);
       clearTimeout(timeoutId);
     };
-  }, [checkLoginStatus]);
+  }, [checkLoginStatus, showSplash]);
 
   // Listen for app state changes to recheck login status
   useEffect(() => {
@@ -106,7 +131,15 @@ export default function AppNavigator() {
 
   // Remove the aggressive polling - AppState listener is sufficient
 
-  if (isLoading) return null;
+  // Show splash screen first
+  if (showSplash) {
+    return <SplashScreen onAnimationComplete={handleSplashComplete} />;
+  }
+
+  // Show loading screen while checking auth
+  if (isLoading) {
+    return <AppLoadingScreen message="Initializing BudgetWise..." />;
+  }
 
   return (
     <NavigationContainer>
@@ -149,6 +182,14 @@ export default function AppNavigator() {
             <Stack.Screen 
               name="Settings" 
               component={SettingsScreen}
+              options={{
+                presentation: 'modal',
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen 
+              name="ViewGroup" 
+              component={ViewGroupScreen}
               options={{
                 presentation: 'modal',
                 headerShown: false,

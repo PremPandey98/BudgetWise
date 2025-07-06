@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_CONFIG } from '../../core/config/constants';
 import CustomPopup, { PopupType } from '../components/CustomPopup';
-import { expenseAPI } from '../../data/services/api';
+import { expenseAPI, depositAPI } from '../../data/services/api';
 
 export default function AddExpenseScreen() {
   const [title, setTitle] = useState('');
@@ -44,7 +44,8 @@ export default function AddExpenseScreen() {
       showPopup('Please enter a valid amount', 'error');
       return false;
     }
-    if (!categoryId && !category.trim()) {
+    // Category is only required for expenses, not deposits
+    if (type === 'expense' && !categoryId && !category.trim()) {
       showPopup('Please select a category', 'error');
       return false;
     }
@@ -77,71 +78,104 @@ export default function AddExpenseScreen() {
       const user = JSON.parse(userData);
       const activeGroup = activeGroupData ? JSON.parse(activeGroupData) : null;
 
-      // Create expense data matching API format
-      const selectedCategoryId = categoryId || (categories.find(cat => cat.name === category)?.id) || 1; // Default to first category
-      
-      console.log('🏷️ Selected category ID:', selectedCategoryId, 'for category:', category);
-      console.log('💰 Adding expense with amount:', amount);
-      
-      // ExpenseRecords API only handles expenses - always send positive amounts
-      const expenseAmount = Math.abs(Number(amount));
-      
-      const expenseData = {
-        amount: expenseAmount,
-        description: description.trim() || title.trim(), // Use title as description if no description provided
-        expenseCategoryID: selectedCategoryId,
-        Tittle: title.trim(), // Note: API uses "Tittle" (with double t)
-      };
+      if (type === 'expense') {
+        // Handle expense creation
+        const selectedCategoryId = categoryId || (categories.find(cat => cat.name === category)?.id) || 1;
+        
+        console.log('🏷️ Selected category ID:', selectedCategoryId, 'for category:', category);
+        console.log('💰 Adding expense with amount:', amount);
+        
+        const expenseAmount = Math.abs(Number(amount));
+        
+        const expenseData = {
+          amount: expenseAmount,
+          description: description.trim() || title.trim(),
+          expenseCategoryID: selectedCategoryId,
+          Tittle: title.trim(), // Note: API uses "Tittle" (with double t)
+        };
 
-      console.log('💰 Creating expense/credit via API:', expenseData);
+        console.log('💰 Creating expense via API:', expenseData);
+        const response = await expenseAPI.addExpenseRecord(expenseData, token);
+        console.log('✅ Expense created successfully:', response);
 
-      // Call API to add expense
-      const response = await expenseAPI.addExpenseRecord(expenseData, token);
-      
-      console.log('✅ Expense created successfully:', response);
+        // Save to local storage
+        const localExpenseData = {
+          id: response.id || Date.now().toString(),
+          title: title.trim(),
+          amount: -Math.abs(Number(amount)), // Negative for expenses
+          description: description.trim(),
+          category: category.trim(),
+          type: type,
+          userId: user.userId,
+          groupId: activeGroup ? activeGroup.id : null,
+          groupCode: activeGroup ? activeGroup.groupCode : null,
+          date: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          apiResponse: response,
+        };
 
-      // Also save to local storage for offline access/caching
-      const localExpenseData = {
-        id: response.id || Date.now().toString(),
-        title: title.trim(),
-        amount: Number(amount), // Store the original amount from form
-        description: description.trim(),
-        category: category.trim(),
-        type: type,
-        userId: user.userId,
-        groupId: activeGroup ? activeGroup.id : null,
-        groupCode: activeGroup ? activeGroup.groupCode : null,
-        date: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        apiResponse: response, // Store API response for reference
-        apiAmount: expenseAmount, // Store the amount sent to API
-      };
+        const storageKey = activeGroup 
+          ? `${APP_CONFIG.STORAGE_KEYS.GROUP_EXPENSES_PREFIX}${activeGroup.id}`
+          : APP_CONFIG.STORAGE_KEYS.PERSONAL_EXPENSES;
 
-      const storageKey = activeGroup 
-        ? `${APP_CONFIG.STORAGE_KEYS.GROUP_EXPENSES_PREFIX}${activeGroup.id}`
-        : APP_CONFIG.STORAGE_KEYS.PERSONAL_EXPENSES;
+        const existingExpenses = await AsyncStorage.getItem(storageKey);
+        const expenses = existingExpenses ? JSON.parse(existingExpenses) : [];
+        expenses.unshift(localExpenseData);
+        await AsyncStorage.setItem(storageKey, JSON.stringify(expenses));
 
-      const existingExpenses = await AsyncStorage.getItem(storageKey);
-      const expenses = existingExpenses ? JSON.parse(existingExpenses) : [];
-      expenses.unshift(localExpenseData); // Add to beginning
+        showPopup(`Expense "${title}" added successfully!`, 'success');
 
-      await AsyncStorage.setItem(storageKey, JSON.stringify(expenses));
+      } else {
+        // Handle deposit creation
+        console.log('💰 Adding deposit with amount:', amount);
+        
+        const depositAmount = Math.abs(Number(amount));
+        
+        const depositData = {
+          amount: depositAmount,
+          description: description.trim() || title.trim(),
+          tittle: title.trim(), // Note: API uses "tittle" (lowercase)
+        };
 
-      const successMessage = type === 'expense' 
-        ? `Expense "${title}" added successfully!`
-        : `Credit "${title}" added successfully!`;
-      
-      showPopup(successMessage, 'success');
+        console.log('💰 Creating deposit via API:', depositData);
+        const response = await depositAPI.addDeposit(depositData, token);
+        console.log('✅ Deposit created successfully:', response);
+
+        // Save to local storage (you might want to use a separate storage key for deposits)
+        const localDepositData = {
+          id: response.id || Date.now().toString(),
+          title: title.trim(),
+          amount: Math.abs(Number(amount)), // Positive for deposits
+          description: description.trim(),
+          category: 'Deposit', // Default category for deposits
+          type: type,
+          userId: user.userId,
+          groupId: activeGroup ? activeGroup.id : null,
+          groupCode: activeGroup ? activeGroup.groupCode : null,
+          date: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          apiResponse: response,
+        };
+
+        const storageKey = activeGroup 
+          ? `${APP_CONFIG.STORAGE_KEYS.GROUP_EXPENSES_PREFIX}${activeGroup.id}`
+          : APP_CONFIG.STORAGE_KEYS.PERSONAL_EXPENSES;
+
+        const existingExpenses = await AsyncStorage.getItem(storageKey);
+        const expenses = existingExpenses ? JSON.parse(existingExpenses) : [];
+        expenses.unshift(localDepositData);
+        await AsyncStorage.setItem(storageKey, JSON.stringify(expenses));
+
+        showPopup(`Deposit "${title}" added successfully!`, 'success');
+      }
 
     } catch (error: any) {
-      console.log('❌ Error saving expense:', error);
+      console.log('❌ Error saving:', error);
       
       let errorMessage = 'Failed to save. Please try again.';
       if (error.response) {
-        // API returned an error response
         errorMessage = `API Error: ${error.response.data?.message || error.response.statusText}`;
       } else if (error.request) {
-        // Network error
         errorMessage = 'Network error. Please check your connection and try again.';
       }
       
@@ -216,10 +250,12 @@ export default function AddExpenseScreen() {
     }
   };
 
-  // Load categories when component mounts
+  // Load categories when component mounts or when type changes to expense
   useEffect(() => {
-    loadCategories();
-  }, []);
+    if (type === 'expense') {
+      loadCategories();
+    }
+  }, [type]);
 
   return (
     <>
@@ -239,7 +275,9 @@ export default function AddExpenseScreen() {
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
               <Ionicons name="arrow-back" size={24} color="#2C5282" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Add Expense</Text>
+            <Text style={styles.headerTitle}>
+              {type === 'expense' ? 'Add Expense' : 'Add Deposit'}
+            </Text>
             <View style={styles.placeholder} />
           </View>
 
@@ -259,16 +297,16 @@ export default function AddExpenseScreen() {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.typeButton, { opacity: 0.5 }]} // Disabled for now
-              disabled={true}
+              style={[styles.typeButton, type === 'credit' && styles.typeButtonActive]}
+              onPress={() => setType('credit')}
             >
               <Ionicons 
                 name="add-circle" 
                 size={20} 
-                color="#B0B0B0" 
+                color={type === 'credit' ? '#fff' : '#00C897'} 
               />
-              <Text style={[styles.typeButtonText, { color: '#B0B0B0' }]}>
-                Credit (Soon)
+              <Text style={[styles.typeButtonText, type === 'credit' && styles.typeButtonTextActive]}>
+                Deposit
               </Text>
             </TouchableOpacity>
           </View>
@@ -277,22 +315,27 @@ export default function AddExpenseScreen() {
           <View style={styles.formContainer}>
             <View style={styles.iconContainer}>
               <Ionicons 
-                name="remove-circle" 
+                name={type === 'expense' ? "remove-circle" : "add-circle"} 
                 size={40} 
-                color="#FF4C5E" 
+                color={type === 'expense' ? "#FF4C5E" : "#00C897"} 
               />
             </View>
             
-            <Text style={styles.title}>Record Expense</Text>
+            <Text style={styles.title}>
+              {type === 'expense' ? 'Record Expense' : 'Record Deposit'}
+            </Text>
             <Text style={styles.subtitle}>
-              Track your spending and manage your budget
+              {type === 'expense' 
+                ? 'Track your spending and manage your budget'
+                : 'Track your income and deposits'
+              }
             </Text>
 
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Title *</Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g. Lunch at restaurant"
+                placeholder={type === 'expense' ? "e.g. Lunch at restaurant" : "e.g. Salary payment"}
                 placeholderTextColor="#B0B0B0"
                 value={title}
                 onChangeText={setTitle}
@@ -317,48 +360,50 @@ export default function AddExpenseScreen() {
               </View>
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>
-                Category * {categories.length > 0 && `(${categories.length} available)`}
-              </Text>
-              {categoriesLoading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color="#4A90E2" />
-                  <Text style={styles.loadingText}>Loading categories...</Text>
-                </View>
-              ) : categoriesError ? (
-                <View style={styles.errorContainer}>
-                  <Text style={styles.errorText}>Failed to load categories</Text>
-                  <TouchableOpacity style={styles.retryButton} onPress={loadCategories}>
-                    <Ionicons name="refresh" size={16} color="#4A90E2" />
-                    <Text style={styles.retryText}>Retry</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-                  {categories.map((cat) => (
-                    <TouchableOpacity
-                      key={cat.id}
-                      style={[styles.categoryChip, categoryId === cat.id && styles.categoryChipActive]}
-                      onPress={() => {
-                        setCategory(cat.name);
-                        setCategoryId(cat.id);
-                      }}
-                    >
-                      <Text style={[styles.categoryChipText, categoryId === cat.id && styles.categoryChipTextActive]}>
-                        {cat.name}
-                      </Text>
+            {type === 'expense' && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>
+                  Category * {categories.length > 0 && `(${categories.length} available)`}
+                </Text>
+                {categoriesLoading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color="#4A90E2" />
+                    <Text style={styles.loadingText}>Loading categories...</Text>
+                  </View>
+                ) : categoriesError ? (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>Failed to load categories</Text>
+                    <TouchableOpacity style={styles.retryButton} onPress={loadCategories}>
+                      <Ionicons name="refresh" size={16} color="#4A90E2" />
+                      <Text style={styles.retryText}>Retry</Text>
                     </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              )}
-            </View>
+                  </View>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+                    {categories.map((cat) => (
+                      <TouchableOpacity
+                        key={cat.id}
+                        style={[styles.categoryChip, categoryId === cat.id && styles.categoryChipActive]}
+                        onPress={() => {
+                          setCategory(cat.name);
+                          setCategoryId(cat.id);
+                        }}
+                      >
+                        <Text style={[styles.categoryChipText, categoryId === cat.id && styles.categoryChipTextActive]}>
+                          {cat.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+            )}
 
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Description</Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
-                placeholder="Add notes or details (optional)"
+                placeholder={type === 'expense' ? "Add notes or details (optional)" : "Add deposit details (optional)"}
                 placeholderTextColor="#B0B0B0"
                 value={description}
                 onChangeText={setDescription}

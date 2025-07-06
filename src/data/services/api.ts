@@ -79,6 +79,53 @@ export const userAPI = {
     }
   },
 
+  // Update user profile with specific UpdateUser endpoint
+  updateUser: async (userId: string, userData: { name: string; email: string; phone: string }, token: string): Promise<any> => {
+    const methods = [
+      // Method 1: POST with userId in path (try this first as it's most common)
+      () => apiClient.post(`${API_ENDPOINTS.USER.UPDATE_USER}/${userId}`, userData, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      // Method 2: POST with userId in body
+      () => apiClient.post(API_ENDPOINTS.USER.UPDATE_USER, { ...userData, userId }, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      // Method 3: PUT with userId in path
+      () => apiClient.put(`${API_ENDPOINTS.USER.UPDATE_USER}/${userId}`, userData, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      // Method 4: PUT with userId in body
+      () => apiClient.put(API_ENDPOINTS.USER.UPDATE_USER, { ...userData, userId }, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      // Method 5: POST with different endpoint pattern
+      () => apiClient.post(`/api/User/Update/${userId}`, userData, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      // Method 6: PATCH with userId in path
+      () => apiClient.patch(`${API_ENDPOINTS.USER.UPDATE_USER}/${userId}`, userData, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+    ];
+
+    for (let i = 0; i < methods.length; i++) {
+      try {
+        console.log(`Trying method ${i + 1} for user update...`);
+        const response = await methods[i]();
+        console.log(`✅ Method ${i + 1} succeeded!`);
+        return response.data;
+      } catch (error: any) {
+        console.log(`❌ Method ${i + 1} failed with status:`, error.response?.status);
+        if ((error.response?.status === 405 || error.response?.status === 404) && i < methods.length - 1) {
+          console.log(`Trying next method...`);
+          continue;
+        }
+        // If it's the last method or not a 405/404 error, throw it
+        throw error;
+      }
+    }
+  },
+
   // Logout user
   logout: async (token: string): Promise<any> => {
     try {
@@ -236,6 +283,105 @@ export const expenseAPI = {
       });
       return response.data;
     } catch (error) {
+      throw error;
+    }
+  },
+
+  // Update expense record - Using POST method to match controller pattern
+  updateExpense: async (expenseId: number, expenseData: any, token: string): Promise<any> => {
+    try {
+      console.log(`🔄 Updating expense ${expenseId} with data:`, expenseData);
+      const response = await apiClient.post(`${API_ENDPOINTS.EXPENSE.UPDATE_EXPENSE_RECORD}/${expenseId}`, expenseData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      console.log(`✅ Successfully updated expense ${expenseId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`❌ Failed to update expense ${expenseId}:`, error?.response?.data || error?.message);
+      throw error;
+    }
+  },
+
+  // Delete expense record
+  deleteExpense: async (expenseId: number, token: string): Promise<any> => {
+    try {
+      console.log(`🗑️ Deleting expense ${expenseId}`);
+      const response = await apiClient.delete(`${API_ENDPOINTS.EXPENSE.DELETE_EXPENSE_RECORD}/${expenseId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      console.log(`✅ Successfully deleted expense ${expenseId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`❌ Failed to delete expense ${expenseId}:`, error?.response?.data || error?.message);
+      throw error;
+    }
+  },
+};
+
+// Deposit API service
+export const depositAPI = {
+  // Add a new deposit
+  addDeposit: async (depositData: { amount: number; description: string; tittle: string }, token: string): Promise<any> => {
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.DEPOSIT.ADD_DEPOSIT, depositData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Get all related deposits (context-aware: personal or group)
+  getAllRelatedDeposits: async (token: string): Promise<any> => {
+    try {
+      const response = await apiClient.get(API_ENDPOINTS.DEPOSIT.GET_ALL_RELATED_DEPOSITS, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Update deposit - Using POST method to match DepositController pattern
+  updateDeposit: async (depositId: number, depositData: any, token: string): Promise<any> => {
+    try {
+      console.log(`🔄 Updating deposit ${depositId} with data:`, depositData);
+      const response = await apiClient.post(`${API_ENDPOINTS.DEPOSIT.UPDATE_DEPOSIT}/${depositId}`, depositData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      console.log(`✅ Successfully updated deposit ${depositId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`❌ Failed to update deposit ${depositId}:`, error?.response?.data || error?.message);
+      throw error;
+    }
+  },
+
+  // Delete deposit
+  deleteDeposit: async (depositId: number, token: string): Promise<any> => {
+    try {
+      console.log(`🗑️ Deleting deposit ${depositId}`);
+      const response = await apiClient.delete(`${API_ENDPOINTS.DEPOSIT.DELETE_DEPOSIT}/${depositId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      console.log(`✅ Successfully deleted deposit ${depositId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`❌ Failed to delete deposit ${depositId}:`, error?.response?.data || error?.message);
       throw error;
     }
   },

@@ -199,7 +199,7 @@ export default function SettingsScreen() {
   const handleAbout = () => {
     Alert.alert(
       'About BudgetWise',
-      'BudgetWise v1.0.0\n\nA simple and powerful expense tracking app for individuals and groups.\n\nDeveloped with ❤️ using React Native',
+      'BudgetWise v1.0.0\n\nA simple and powerful expense tracking app for individuals and groups.\n\nDeveloped by Akshay and Prem ',
       [{ text: 'OK' }]
     );
   };

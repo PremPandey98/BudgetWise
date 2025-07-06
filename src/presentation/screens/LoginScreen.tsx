@@ -48,18 +48,20 @@ export default function LoginScreen({ navigation }: Props) {
     try {
       // Call API service
       const loginResponse: LoginResponse = await userAPI.login(credentials);
-      console.log('Login Response:', loginResponse);
       
       // Save user data to AsyncStorage for dashboard
+      const userDataToStore = {
+        name: loginResponse.name, 
+        userName: loginResponse.userName,
+        email: loginResponse.email,
+        userId: loginResponse.userId,
+        phone: loginResponse.phone || '', // Store phone if available
+        token: loginResponse.token
+      };
+      
       await AsyncStorage.setItem(
         APP_CONFIG.STORAGE_KEYS.USER_DATA,
-        JSON.stringify({
-          name: loginResponse.name, 
-          userName: loginResponse.userName,
-          email: loginResponse.email,
-          userId: loginResponse.userId,
-          token: loginResponse.token
-        })
+        JSON.stringify(userDataToStore)
       );
       
       // Ensure the data is written before showing success message
@@ -67,7 +69,6 @@ export default function LoginScreen({ navigation }: Props) {
 
       // Fetch and store user groups immediately after login
       try {
-        console.log('🔍 Fetching user groups after login...');
         const userDetails = await userAPI.getUserDetails(loginResponse.token);
         const groups = userDetails.groups?.$values || [];
         
@@ -76,12 +77,24 @@ export default function LoginScreen({ navigation }: Props) {
           APP_CONFIG.STORAGE_KEYS.USER_GROUPS,
           JSON.stringify(groups)
         );
-        console.log('✅ Groups stored successfully:', groups);
+        
+        // Update user data with phone number if available from userDetails
+        if (userDetails.phone || userDetails.phoneNumber) {
+          const updatedUserData = {
+            ...userDataToStore,
+            phone: userDetails.phone || userDetails.phoneNumber || ''
+          };
+          
+          await AsyncStorage.setItem(
+            APP_CONFIG.STORAGE_KEYS.USER_DATA,
+            JSON.stringify(updatedUserData)
+          );
+        }
         
         // Ensure the data is written
         await new Promise(resolve => setTimeout(resolve, 50));
       } catch (groupError) {
-        console.log('⚠️ Failed to fetch groups on login:', groupError);
+        console.error('Failed to fetch groups/profile on login:', groupError);
         // Don't fail login if groups fetch fails, just store empty array
         await AsyncStorage.setItem(APP_CONFIG.STORAGE_KEYS.USER_GROUPS, JSON.stringify([]));
         // Ensure the data is written

@@ -4,12 +4,11 @@ import { Ionicons, MaterialIcons, FontAwesome } from '@expo/vector-icons';
 import DashboardScreen from '../screens/DashboardScreen';
 import HomeScreen from '../screens/HomeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import ExpenseAnalyticsScreen from '../screens/ExpenseAnalyticsScreen';
+import TransactionsScreen from '../screens/TransactionsScreen';
 import { View, Text } from 'react-native';
 
-// Placeholder screens for Expense, Deposit
-function ExpenseScreen() {
-  return <View style={{flex:1,justifyContent:'center',alignItems:'center'}}><Text>Expense</Text></View>;
-}
+// Placeholder screens for Deposit
 function DepositScreen() {
   return <View style={{flex:1,justifyContent:'center',alignItems:'center'}}><Text>Deposit (Wallet)</Text></View>;
 }
@@ -55,8 +54,8 @@ export default function MainTabNavigator() {
             return <Ionicons name="home" size={28} color={iconColor} style={{ alignSelf: 'center' }} />;
           } else if (route.name === 'Expense') {
             return <MaterialIcons name="bar-chart" size={26} color={iconColor} style={{ alignSelf: 'center' }} />;
-          } else if (route.name === 'Deposit') {
-            return <FontAwesome name="credit-card" size={24} color={iconColor} style={{ alignSelf: 'center' }} />;
+          } else if (route.name === 'Transactions') {
+            return <Ionicons name="list" size={26} color={iconColor} style={{ alignSelf: 'center' }} />;
           } else if (route.name === 'Profile') {
             return <Ionicons name="person-outline" size={26} color={iconColor} style={{ alignSelf: 'center' }} />;
           }
@@ -64,8 +63,8 @@ export default function MainTabNavigator() {
       })}
     >
       <Tab.Screen name="Home" component={DashboardScreen} />
-      <Tab.Screen name="Expense" component={ExpenseScreen} />
-      <Tab.Screen name="Deposit" component={DepositScreen} />
+      <Tab.Screen name="Expense" component={ExpenseAnalyticsScreen} />
+      <Tab.Screen name="Transactions" component={TransactionsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, FlatList, ActivityIndicator, RefreshControl, TextInput } from 'react-native';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -7,7 +7,7 @@ import CustomPopup, { PopupType } from '../components/CustomPopup';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_CONFIG } from '../../core/config/constants';
 import { useFocusEffect } from '@react-navigation/native';
-import { expenseAPI, userAPI } from '../../data/services/api';
+import { expenseAPI, userAPI, depositAPI } from '../../data/services/api';
 import { TokenManager } from '../../data/TokenManager';
 import ContextIndicator from '../components/ContextIndicator';
 
@@ -25,7 +25,7 @@ const demoBalance = {
 
 const demoTransactions = [
   {
-    id: '1',
+    id: 'demo_1_health',
     category: 'Health',
     icon: 'heart',
     iconColor: '#FF4C5E',
@@ -33,9 +33,10 @@ const demoTransactions = [
     amount: -25,
     desc: 'checkup fee',
     date: '11 Dec',
+    type: 'expense',
   },
   {
-    id: '2',
+    id: 'demo_2_income',
     category: 'Income',
     icon: 'attach-money',
     iconColor: '#3ED598',
@@ -43,9 +44,10 @@ const demoTransactions = [
     amount: 60,
     desc: 'Gift from Family',
     date: '10 Dec',
+    type: 'income',
   },
   {
-    id: '3',
+    id: 'demo_3_clothing',
     category: 'Clothing',
     icon: 'tshirt',
     iconColor: '#A259FF',
@@ -53,9 +55,10 @@ const demoTransactions = [
     amount: -20,
     desc: 'Winter Clothing',
     date: '10 Dec',
+    type: 'expense',
   },
   {
-    id: '4',
+    id: 'demo_4_income2',
     category: 'Income',
     icon: 'attach-money',
     iconColor: '#3ED598',
@@ -63,9 +66,10 @@ const demoTransactions = [
     amount: 90,
     desc: 'Cashback from Credit Card',
     date: '9 Dec',
+    type: 'income',
   },
   {
-    id: '5',
+    id: 'demo_5_dining',
     category: 'Dining',
     icon: 'restaurant',
     iconColor: '#FF7363',
@@ -73,6 +77,7 @@ const demoTransactions = [
     amount: -30,
     desc: 'Had dinner at hotel',
     date: '9 Dec',
+    type: 'expense',
   },
 ];
 
@@ -80,6 +85,8 @@ export default function DashboardScreen({ navigation }: Props) {
   const [logoutPopup, setLogoutPopup] = useState({ visible: false });
   const [userName, setUserName] = useState<string>('');
   const [expenses, setExpenses] = useState<any[]>([]);
+  const [deposits, setDeposits] = useState<any[]>([]);
+  const [allTransactions, setAllTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [balance, setBalance] = useState({
@@ -87,10 +94,40 @@ export default function DashboardScreen({ navigation }: Props) {
     income: 0,
     expense: 0,
   });
+  
+  // Search functionality state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+  const [filteredExpenses, setFilteredExpenses] = useState<any[]>([]);
 
-  // Function to fetch expenses from API
-  const fetchExpenses = async (showLoading = true) => {
+  // Key counter for ensuring unique keys
+  const keyCounterRef = React.useRef(0);
+
+  // Function to generate guaranteed unique keys
+  const generateUniqueKey = (item: any, index: number): string => {
+    keyCounterRef.current += 1;
+    
+    // Try to use existing ID first
+    if (item.id && typeof item.id === 'string' && item.id.length > 0) {
+      return item.id;
+    }
+    
+    // Create a compound key with multiple components for absolute uniqueness
+    const timestamp = Date.now();
+    const randomComponent = Math.random().toString(36).substr(2, 9);
+    const counterComponent = keyCounterRef.current;
+    const typeComponent = item.type || 'transaction';
+    
+    return `${typeComponent}_${index}_${timestamp}_${counterComponent}_${randomComponent}`;
+  };
+
+  // Function to fetch both expenses and deposits from API
+  const fetchTransactions = async (showLoading = true) => {
     if (showLoading) setLoading(true);
+    
+    // Reset key counter for new data fetch
+    keyCounterRef.current = 0;
+    
     try {
       // Use TokenManager to get current context token (personal or group)
       const token = await TokenManager.getCurrentToken();
@@ -99,17 +136,25 @@ export default function DashboardScreen({ navigation }: Props) {
         console.log('❌ No token available - user may need to login again');
         // Fall back to demo data when no token
         setExpenses(demoTransactions);
+        setDeposits([]);
+        setAllTransactions(demoTransactions);
         setBalance(demoBalance);
         return;
       }
       
-      console.log('🔍 Fetching context-aware expenses from API...');
+      console.log('🔍 Fetching context-aware transactions from API...');
       console.log('🔑 Using token (first 20 chars):', token.substring(0, 20) + '...');
       
-      const expensesData = await expenseAPI.getAllRelatedExpenseRecords(token);
+      // Fetch both expenses and deposits in parallel
+      const [expensesData, depositsData] = await Promise.all([
+        expenseAPI.getAllRelatedExpenseRecords(token),
+        depositAPI.getAllRelatedDeposits(token)
+      ]);
+      
       console.log('✅ Context-aware expenses loaded:', expensesData);
+      console.log('✅ Context-aware deposits loaded:', depositsData);
           
-      // Handle the API response structure with $values
+      // Handle the API response structure with $values for expenses
       let expenseList = [];
       if (expensesData && expensesData.$values) {
         expenseList = expensesData.$values;
@@ -117,42 +162,116 @@ export default function DashboardScreen({ navigation }: Props) {
         expenseList = expensesData;
       }
       
-      // Transform API data to dashboard format
-      // ALL records from ExpenseRecords API are expenses (should be red/negative)
-      const transformedExpenses = expenseList.map((expense: any) => {
+      // Handle the API response structure with $values for deposits
+      let depositList = [];
+      if (depositsData && depositsData.$values) {
+        depositList = depositsData.$values;
+      } else if (Array.isArray(depositsData)) {
+        depositList = depositsData;
+      }
+      
+      // Transform expenses data to dashboard format
+      const transformedExpenses = expenseList.map((expense: any, index: number) => {
         // Convert all amounts to negative for display (expenses)
         const displayAmount = -Math.abs(expense.amount);
         
+        // Create unique ID with enhanced fallback to ensure no duplicates
+        let uniqueId;
+        if (expense.expenseId) {
+          uniqueId = `expense_${expense.expenseId}`;
+        } else if (expense.id) {
+          uniqueId = `expense_id_${expense.id}`;
+        } else {
+          // Create a completely unique ID when no database ID exists
+          const timestamp = Date.now();
+          const randomPart = Math.random().toString(36).substr(2, 9);
+          uniqueId = `expense_generated_${index}_${timestamp}_${randomPart}`;
+        }
+        
         return {
-          id: expense.expenseId?.toString() || Date.now().toString(),
+          id: uniqueId,
           category: getCategoryName(expense.expenseCategoryID),
           icon: getCategoryIcon(expense.expenseCategoryID),
-          iconColor: '#FF7A7A', // All expenses are light red
+          iconColor: '#FF7A7A', // All expenses are red
           bgColor: '#2D2D2D',
           amount: displayAmount, // Always negative
           desc: expense.description || 'No description',
           date: formatDate(expense.createdAt),
+          type: 'expense',
           originalData: expense, // Keep original data for reference
         };
       });
       
-      setExpenses(transformedExpenses);
+      // Transform deposits data to dashboard format
+      const transformedDeposits = depositList.map((deposit: any, index: number) => {
+        // Keep deposits as positive amounts (income)
+        const displayAmount = Math.abs(deposit.amount);
+        
+        // Create unique ID with enhanced fallback to ensure no duplicates
+        let uniqueId;
+        if (deposit.depositId) {
+          uniqueId = `deposit_${deposit.depositId}`;
+        } else if (deposit.id) {
+          uniqueId = `deposit_id_${deposit.id}`;
+        } else {
+          // Create a completely unique ID when no database ID exists
+          const timestamp = Date.now();
+          const randomPart = Math.random().toString(36).substr(2, 9);
+          uniqueId = `deposit_generated_${index}_${timestamp}_${randomPart}`;
+        }
+        
+        return {
+          id: uniqueId,
+          category: 'Income', // Generic category for deposits
+          icon: 'trending-up',
+          iconColor: '#3ED598', // Green for income/deposits
+          bgColor: '#2D2D2D',
+          amount: displayAmount, // Always positive
+          desc: deposit.description || 'Deposit/Income',
+          date: formatDate(deposit.createdAt),
+          type: 'deposit',
+          originalData: deposit, // Keep original data for reference
+        };
+      });
       
-      // Calculate balance - only expenses for now (no income API yet)
+      // Combine and sort transactions by date (newest first)
+      const allTransactions = [...transformedExpenses, ...transformedDeposits].sort((a, b) => {
+        return new Date(b.originalData.createdAt).getTime() - new Date(a.originalData.createdAt).getTime();
+      });
+
+      // Debug: Check for duplicate IDs
+      const ids = allTransactions.map(t => t.id);
+      const uniqueIds = new Set(ids);
+      if (ids.length !== uniqueIds.size) {
+        console.warn('⚠️ Duplicate transaction IDs detected:', {
+          totalTransactions: ids.length,
+          uniqueIds: uniqueIds.size,
+          duplicates: ids.filter((id, index) => ids.indexOf(id) !== index)
+        });
+      } else {
+        console.log('✅ All transaction IDs are unique:', ids.length, 'transactions');
+      }
+      
+      setExpenses(transformedExpenses);
+      setDeposits(transformedDeposits);
+      setAllTransactions(allTransactions);
+      
+      // Calculate balance with both expenses and deposits
       const totalExpense = transformedExpenses
         .reduce((sum: number, exp: any) => sum + Math.abs(exp.amount), 0);
       
-      const totalIncome = 0; // No income API yet
+      const totalIncome = transformedDeposits
+        .reduce((sum: number, dep: any) => sum + Math.abs(dep.amount), 0);
       
       setBalance({
-        total: totalIncome - totalExpense, // Will be negative
+        total: totalIncome - totalExpense,
         income: totalIncome,
         expense: totalExpense,
       });
       
-      console.log('✅ Dashboard data updated');
+      console.log('✅ Dashboard data updated with expenses and deposits');
     } catch (error: any) {
-      console.log('❌ Error fetching expenses:', error);
+      console.log('❌ Error fetching transactions:', error);
       
       // Check if it's a 401 error specifically
       if (error.response?.status === 401) {
@@ -169,6 +288,8 @@ export default function DashboardScreen({ navigation }: Props) {
       
       // Fall back to demo data on error
       setExpenses(demoTransactions);
+      setDeposits([]);
+      setAllTransactions(demoTransactions);
       setBalance(demoBalance);
     } finally {
       if (showLoading) setLoading(false);
@@ -233,7 +354,56 @@ export default function DashboardScreen({ navigation }: Props) {
   // Function to handle refresh
   const onRefresh = () => {
     setRefreshing(true);
-    fetchExpenses(false);
+    fetchTransactions(false);
+  };
+
+  // Enhanced search functionality
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    
+    if (!query.trim()) {
+      setFilteredExpenses(allTransactions);
+      return;
+    }
+    
+    const lowercaseQuery = query.toLowerCase();
+    const filtered = allTransactions.filter(transaction => {
+      // Search in category name
+      const categoryMatch = transaction.category.toLowerCase().includes(lowercaseQuery);
+      
+      // Search in description/transaction name
+      const descMatch = transaction.desc.toLowerCase().includes(lowercaseQuery);
+      
+      // Search in title if it exists
+      const titleMatch = transaction.title ? transaction.title.toLowerCase().includes(lowercaseQuery) : false;
+      
+      // Search in amount (both numeric value and formatted string)
+      const amountMatch = Math.abs(transaction.amount).toString().includes(lowercaseQuery) ||
+                          `₹${Math.abs(transaction.amount).toFixed(2)}`.includes(lowercaseQuery) ||
+                          Math.abs(transaction.amount).toFixed(2).includes(lowercaseQuery);
+      
+      // Search in date
+      const dateMatch = transaction.date.toLowerCase().includes(lowercaseQuery);
+      
+      // Search in transaction ID if needed
+      const idMatch = transaction.id.toString().includes(lowercaseQuery);
+      
+      // Search by transaction type (expense/deposit)
+      const typeMatch = transaction.type && transaction.type.toLowerCase().includes(lowercaseQuery);
+      
+      return categoryMatch || descMatch || titleMatch || amountMatch || dateMatch || idMatch || typeMatch;
+    });
+    
+    setFilteredExpenses(filtered);
+  };
+
+  const toggleSearch = () => {
+    setShowSearch(!showSearch);
+    if (showSearch) {
+      // Clear search when hiding search bar
+      setSearchQuery('');
+      setFilteredExpenses(allTransactions);
+    }
   };
 
   React.useEffect(() => {
@@ -252,13 +422,22 @@ export default function DashboardScreen({ navigation }: Props) {
     };
     
     fetchUserData();
-    fetchExpenses(); // Fetch expenses on component mount
+    fetchTransactions(); // Fetch expenses and deposits on component mount
   }, []);
+
+  // Update filtered expenses when allTransactions change
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      handleSearch(searchQuery);
+    } else {
+      setFilteredExpenses(allTransactions);
+    }
+  }, [allTransactions]);
 
   // Refresh expenses when screen comes into focus (e.g., after adding an expense)
   useFocusEffect(
     React.useCallback(() => {
-      fetchExpenses(false); // Refresh without showing loading spinner
+      fetchTransactions(false); // Refresh without showing loading spinner
     }, [])
   );
 
@@ -374,10 +553,33 @@ export default function DashboardScreen({ navigation }: Props) {
             <Text style={styles.helloText}>Hello,</Text>
             <Text style={styles.userName}>{userName}</Text>
           </View>
-          <TouchableOpacity style={styles.searchIcon}>
-            <Ionicons name="search" size={24} color="#B0B0B0" />
+          <TouchableOpacity style={styles.searchIcon} onPress={toggleSearch}>
+            <Ionicons name={showSearch ? "close" : "search"} size={24} color="#B0B0B0" />
           </TouchableOpacity>
         </View>
+
+        {/* Search Bar */}
+        {showSearch && (
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color="#B0B0B0" style={{ marginRight: 10 }} />
+            <TextInput
+              value={searchQuery}
+              onChangeText={handleSearch}
+              placeholder="Search transactions by category, description, or amount"
+              placeholderTextColor="#B0B0B0"
+              style={styles.searchInput}
+              autoFocus={showSearch}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => {
+                setSearchQuery('');
+                handleSearch('');
+              }} style={styles.closeSearch}>
+                <Ionicons name="close-circle" size={20} color="#B0B0B0" />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Context Indicator */}
         <ContextIndicator />
@@ -410,17 +612,21 @@ export default function DashboardScreen({ navigation }: Props) {
 
         {/* Recent Transactions */}
         <Text style={styles.recentTitle}>Recent Transactions</Text>
-        {expenses.length === 0 && !loading ? (
+        {filteredExpenses.length === 0 && !loading ? (
           <View style={styles.emptyState}>
             <Ionicons name="receipt-outline" size={48} color="#B0B0B0" />
-            <Text style={styles.emptyStateText}>No transactions yet</Text>
-            <Text style={styles.emptyStateSubtext}>Tap the + button to add your first expense</Text>
+            <Text style={styles.emptyStateText}>
+              {searchQuery.trim() ? "No matching transactions found" : "No transactions yet"}
+            </Text>
+            <Text style={styles.emptyStateSubtext}>
+              {searchQuery.trim() ? "Try adjusting your search terms" : "Tap the + button to add your first transaction"}
+            </Text>
           </View>
         ) : (
           <FlatList
-            data={expenses}
+            data={filteredExpenses}
             renderItem={renderTransaction}
-            keyExtractor={item => item.id}
+            keyExtractor={(item, index) => generateUniqueKey(item, index)}
             style={{ flexGrow: 0 }}
             contentContainerStyle={{ paddingBottom: 80 }}
             showsVerticalScrollIndicator={false}
@@ -638,5 +844,29 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  searchContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    marginHorizontal: 18,
+    marginBottom: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    shadowColor: '#4A90E2',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#2C5282',
+    paddingVertical: 0,
+  },
+  closeSearch: {
+    padding: 8,
   },
 });

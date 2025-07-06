@@ -1,16 +1,23 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, ScrollView, Modal, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, TextInput, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_CONFIG } from '../../core/config/constants';
 import { Ionicons, MaterialIcons, FontAwesome } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import CustomPopup from '../components/CustomPopup';
+import Avatar from '../components/Avatar';
 import { userAPI, groupAPI } from '../../data/services/api';
 import { TokenManager } from '../../data/TokenManager';
 import ContextIndicator from '../components/ContextIndicator';
+import { AvatarColorStorage } from '../../utils/AvatarColorStorage';
+
+type ProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function ProfileScreen() {
   const [user, setUser] = useState({ name: '', email: '' });
+  const [avatarColor, setAvatarColor] = useState<string>('');
   const [logoutPopup, setLogoutPopup] = useState(false);
   const [groupExpanded, setGroupExpanded] = useState(false);
   const [userGroups, setUserGroups] = useState([]);
@@ -20,7 +27,7 @@ export default function ProfileScreen() {
   const [groupCode, setGroupCode] = useState('');
   const [groupPassword, setGroupPassword] = useState('');
   const [joinLoading, setJoinLoading] = useState(false);
-  const navigation = useNavigation();
+  const navigation = useNavigation<ProfileScreenNavigationProp>();
   const groupPasswordInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -54,6 +61,8 @@ export default function ProfileScreen() {
         if (success) {
           setActiveGroup(group);
           console.log('✅ Active group set with token context:', group.groupName);
+          // Navigate back to Dashboard tab in the tab navigator
+          navigation.goBack();
         } else {
           throw new Error('Failed to switch to group context');
         }
@@ -63,6 +72,8 @@ export default function ProfileScreen() {
         if (success) {
           setActiveGroup(null);
           console.log('✅ Switched to Personal mode');
+          // Navigate back to Dashboard tab in the tab navigator
+          navigation.goBack();
         } else {
           throw new Error('Failed to switch to personal context');
         }
@@ -140,10 +151,19 @@ export default function ProfileScreen() {
       const userData = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER_DATA);
       if (userData) {
         const parsed = JSON.parse(userData);
+        const userEmail = parsed.email || '';
+        
         setUser({
           name: parsed.name || parsed.userName || 'User',
-          email: parsed.email || '',
+          email: userEmail,
         });
+
+        // Load avatar color from local storage
+        if (userEmail) {
+          const savedAvatarColor = await AvatarColorStorage.loadAvatarColor(userEmail);
+          setAvatarColor(savedAvatarColor || '');
+          console.log('Profile - Avatar color loaded:', savedAvatarColor);
+        }
       }
     } catch (error) {
       console.log('Error fetching user:', error);
@@ -176,6 +196,9 @@ export default function ProfileScreen() {
     await TokenManager.clearAllTokens();
     await AsyncStorage.removeItem(APP_CONFIG.STORAGE_KEYS.USER_GROUPS);
     await AsyncStorage.removeItem(APP_CONFIG.STORAGE_KEYS.APP_SETTINGS);
+    
+    // Clear avatar colors for all users (optional - could keep for faster re-login)
+    await AvatarColorStorage.clearAllAvatarColors();
     
     // Set navigation trigger to force AppNavigator to detect logout
     await AsyncStorage.setItem('@budgetwise_navigation_trigger', Date.now().toString());
@@ -303,12 +326,23 @@ export default function ProfileScreen() {
       {/* Context Indicator */}
       <ContextIndicator />
       
-      <View style={styles.avatarContainer}>
-        <Image
-          source={require('../../../assets/icon.png')}
-          style={styles.avatar}
+      <TouchableOpacity 
+        style={styles.avatarContainer}
+        activeOpacity={0.8}
+        onPress={() => {
+          // Could potentially open avatar change modal in future
+          console.log('Avatar tapped - could implement photo change functionality');
+        }}
+      >
+        <Avatar 
+          name={user.name} 
+          size={100}
+          fontSize={36}
+          borderWidth={3}
+          borderColor="#E6F3FF"
+          {...(avatarColor && { backgroundColor: avatarColor })}
         />
-      </View>
+      </TouchableOpacity>
       <Text style={styles.name}>{user.name}</Text>
       <Text style={styles.email}>{user.email}</Text>
       <View style={styles.menuList}>
@@ -352,14 +386,24 @@ export default function ProfileScreen() {
               {/* Current Active Group Display */}
               <View style={styles.activeGroupContainer}>
                 <Text style={styles.activeGroupLabel}>Currently Active:</Text>
-                <View style={[styles.groupItem, styles.activeGroupItem]}>
-                  <View style={[styles.groupAvatar, activeGroup ? {} : styles.personalAvatar]}>
-                    <Ionicons 
-                      name={activeGroup ? "people" : "person"} 
-                      size={20} 
-                      color={activeGroup ? "#FF9500" : "#4A90E2"} 
+                <TouchableOpacity 
+                  style={[styles.groupItem, styles.activeGroupItem]}
+                  onPress={() => activeGroup && navigation.getParent()?.navigate('ViewGroup', { group: activeGroup })}
+                  activeOpacity={activeGroup ? 0.7 : 1}
+                  disabled={!activeGroup}
+                >
+                  {activeGroup ? (
+                    <Avatar 
+                      name={activeGroup.groupName} 
+                      size={40}
+                      fontSize={16}
+                      backgroundColor="#FF9500"
                     />
-                  </View>
+                  ) : (
+                    <View style={[styles.groupAvatar, styles.personalAvatar]}>
+                      <Ionicons name="person" size={20} color="#4A90E2" />
+                    </View>
+                  )}
                   <View style={styles.groupInfo}>
                     <Text style={styles.groupName}>
                       {activeGroup ? activeGroup.groupName : "Personal"}
@@ -373,8 +417,11 @@ export default function ProfileScreen() {
                   </View>
                   <View style={styles.activeIndicator}>
                     <Ionicons name="checkmark-circle" size={24} color="#00C897" />
+                    {activeGroup && (
+                      <Ionicons name="chevron-forward" size={20} color="#00C897" style={{ marginLeft: 8 }} />
+                    )}
                   </View>
-                </View>
+                </TouchableOpacity>
               </View>
 
               {/* Group Selection */}
@@ -408,13 +455,18 @@ export default function ProfileScreen() {
                 userGroups
                   .filter((group: any) => !activeGroup || group.id !== activeGroup.id)
                   .map((group: any, index: number) => (
-                    <View 
+                    <TouchableOpacity
                       key={group.id || index} 
                       style={styles.groupItem}
+                      onPress={() => navigation.getParent()?.navigate('ViewGroup', { group })}
+                      activeOpacity={0.7}
                     >
-                      <View style={styles.groupAvatar}>
-                        <Ionicons name="people" size={20} color="#FF9500" />
-                      </View>
+                      <Avatar 
+                        name={group.groupName || `Group ${index + 1}`} 
+                        size={40}
+                        fontSize={16}
+                        backgroundColor="#FF9500"
+                      />
                       <View style={styles.groupInfo}>
                         <Text style={styles.groupName}>
                           {group.groupName || `Group ${index + 1}`}
@@ -431,18 +483,24 @@ export default function ProfileScreen() {
                       <View style={styles.groupButtonsContainer}>
                         <TouchableOpacity 
                           style={styles.selectButton}
-                          onPress={() => setActiveGroupAndSave(group)}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            setActiveGroupAndSave(group);
+                          }}
                         >
                           <Text style={styles.selectButtonText}>Select</Text>
                         </TouchableOpacity>
                         <TouchableOpacity 
-                          style={styles.removeButton}
-                          onPress={() => handleRemoveFromGroup(group)}
+                          style={styles.viewButton}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            navigation.getParent()?.navigate('ViewGroup', { group });
+                          }}
                         >
-                          <Ionicons name="trash-outline" size={16} color="#FF4C5E" />
+                          <Text style={styles.viewButtonText}>View</Text>
                         </TouchableOpacity>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   ))
               ) : (
                 <View style={styles.noGroupsContainer}>
@@ -584,16 +642,8 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginBottom: 16,
-    borderRadius: 60,
-    overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: '#4A90E2', // Blue border
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#E6F3FF', // Lighter blue
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   name: {
     color: '#2C5282',
@@ -771,6 +821,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 6,
     marginLeft: 4,
+  },
+  viewButton: {
+    backgroundColor: '#E6F3FF',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginLeft: 4,
+  },
+  viewButtonText: {
+    color: '#4A90E2',
+    fontSize: 14,
+    fontWeight: '500',
   },
   createGroupButton: {
     flex: 1,

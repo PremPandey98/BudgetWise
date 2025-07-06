@@ -32,7 +32,7 @@ function getDevBaseUrl(): string {
   } else {
     // For Physical Device: use your computer's IP address
     // Android/iOS physical devices cannot access localhost - need your computer's IP
-    baseIP = '192.168.1.236'; // Your computer's actual IP address
+    baseIP = '192.168.0.112'; // Your computer's actual IP address
   }
   
   return `http://${baseIP}:5091`;
@@ -51,6 +51,8 @@ export const API_ENDPOINTS = {
     ADD_USER: '/api/User/AddUser',        // Your existing User endpoint
     PROFILE: '/api/User/profile',
     UPDATE: '/api/User/update',
+    UPDATE_USER: '/api/User/UpdateUser',  // Updated to match User controller (capital U)
+    UPDATE_USER_ALT: '/api/User/Update',  // Alternative endpoint structure
     ME: '/api/user/me',                   // New endpoint for user details with groups
     UPDATE_USER_GROUPS: '/api/user/UpdateUserGroups', // Endpoint for adding user to group
     REMOVE_USER_GROUP: '/api/user/RemoveUserGroup', // Endpoint for removing user from group
@@ -63,6 +65,14 @@ export const API_ENDPOINTS = {
     GET_CATEGORIES: '/api/ExpenseCategory/',  // Endpoint for fetching expense categories
     GET_ALL_EXPENSE_RECORDS: '/api/ExpenseRecords/GetAllExpenseRecord',  // Endpoint for fetching all expense records
     GET_ALL_RELATED_EXPENSE_RECORDS: '/api/ExpenseRecords/GetAllRelatedExpenseRecord', // Context-aware endpoint (personal/group)
+    UPDATE_EXPENSE_RECORD: '/api/ExpenseRecords/UpdateexpenseRecord',  // Endpoint for updating expense records (POST method)
+    DELETE_EXPENSE_RECORD: '/api/ExpenseRecords/DeleteExpenseRecord',  // Endpoint for deleting expense records (DELETE method)
+  },
+  DEPOSIT: {
+    ADD_DEPOSIT: '/api/Deposit/AddDeposit',           // Endpoint for adding deposits
+    GET_ALL_RELATED_DEPOSITS: '/api/Deposit/GetAllRelatedDeposit',  // Context-aware endpoint for deposits/credits
+    UPDATE_DEPOSIT: '/api/Deposit/UpdateDeposit',     // Endpoint for updating deposits
+    DELETE_DEPOSIT: '/api/Deposit/DeleteDeposit',     // Endpoint for deleting deposits
   },
 };
 

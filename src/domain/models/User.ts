@@ -14,6 +14,7 @@ export interface LoginResponse {
   token: string;
   userId: string;
   userName: string;
+  phone?: string; // Added phone field
 }
 
 export interface RegisterRequest {

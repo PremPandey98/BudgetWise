@@ -145,7 +145,11 @@ export class TokenManager {
         const parsed = JSON.parse(userData);
         console.log('  📄 User Data exists');
         console.log('  👤 User:', parsed.name || parsed.userName || 'Unknown');
-        console.log('  🔑 Personal Token (first 20 chars):', parsed.token ? parsed.token.substring(0, 20) + '...' : 'None');
+        console.log('  🆔 UserId:', parsed.userId || 'MISSING');
+        console.log('  � Email:', parsed.email || 'Unknown');
+        console.log('  📱 Phone:', parsed.phone || parsed.phoneNumber || 'Unknown');
+        console.log('  �🔑 Personal Token (first 20 chars):', parsed.token ? parsed.token.substring(0, 20) + '...' : 'None');
+        console.log('  📋 Full User Data Keys:', Object.keys(parsed));
       } else {
         console.log('  ❌ No user data found');
       }
@@ -170,6 +174,25 @@ export class TokenManager {
       
     } catch (error) {
       console.log('❌ Error in token debug:', error);
+    }
+  }
+
+  // Debug method to check user data specifically
+  static async debugUserData(): Promise<any> {
+    try {
+      const userData = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER_DATA);
+      if (userData) {
+        const parsed = JSON.parse(userData);
+        console.log('🔍 User Data Debug:');
+        console.log('  Full Object:', parsed);
+        return parsed;
+      } else {
+        console.log('❌ No user data found in storage');
+        return null;
+      }
+    } catch (error) {
+      console.log('❌ Error reading user data:', error);
+      return null;
     }
   }
 }
