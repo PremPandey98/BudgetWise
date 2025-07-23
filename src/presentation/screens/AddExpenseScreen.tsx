@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_CONFIG } from '../../core/config/constants';
 import CustomPopup, { PopupType } from '../components/CustomPopup';
 import { expenseAPI, depositAPI } from '../../data/services/api';
+import AdaptiveStatusBar from '../components/AdaptiveStatusBar';
 
 export default function AddExpenseScreen() {
   const [title, setTitle] = useState('');
@@ -97,6 +98,14 @@ export default function AddExpenseScreen() {
         console.log('💰 Creating expense via API:', expenseData);
         const response = await expenseAPI.addExpenseRecord(expenseData, token);
         console.log('✅ Expense created successfully:', response);
+
+        // Trigger notification for large expense
+        try {
+          const { NotificationService } = await import('../../services/NotificationService');
+          await NotificationService.checkAndNotifySpending(expenseAmount, category.trim() || 'Expense');
+        } catch (notifError) {
+          console.log('⚠️ Error with expense notification:', notifError);
+        }
 
         // Save to local storage
         const localExpenseData = {
@@ -259,6 +268,7 @@ export default function AddExpenseScreen() {
 
   return (
     <>
+      <AdaptiveStatusBar backgroundColor="#F0F8FF" />
       <CustomPopup visible={popup.visible} message={popup.message} type={popup.type} onClose={closePopup} />
       <KeyboardAvoidingView 
         style={styles.container} 

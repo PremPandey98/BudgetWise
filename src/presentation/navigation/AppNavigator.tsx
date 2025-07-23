@@ -16,7 +16,12 @@ import AddExpenseScreen from '../screens/AddExpenseScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import ViewGroupScreen from '../screens/ViewGroupScreen';
+import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
+import BiometricSettingsScreen from '../screens/BiometricSettingsScreen';
+import BiometricAuthScreen from '../screens/BiometricAuthScreen';
 import MainTabNavigator from './MainTabNavigator';
+import AdaptiveStatusBar from '../components/AdaptiveStatusBar';
+import { BiometricService } from '../../services/BiometricService';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -28,6 +33,9 @@ export type RootStackParamList = {
   AddExpense: undefined;
   EditProfile: undefined;
   Settings: undefined;
+  NotificationSettings: undefined;
+  BiometricSettings: undefined;
+  BiometricAuth: undefined;
   ViewGroup: {
     group: {
       id: string;
@@ -46,6 +54,8 @@ export default function AppNavigator() {
   const [isLoading, setIsLoading] = useState(true);
   const [showSplash, setShowSplash] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [needsBiometricAuth, setNeedsBiometricAuth] = useState(false);
+  const [biometricChecked, setBiometricChecked] = useState(false);
 
   const checkLoginStatus = useCallback(async () => {
     try {
@@ -55,9 +65,28 @@ export default function AppNavigator() {
       // Simulate some loading time for better UX
       await new Promise(resolve => setTimeout(resolve, 1000));
       
+      // Check biometric authentication if user is logged in and biometrics not checked yet
+      if (loggedIn && !biometricChecked && !needsBiometricAuth) {
+        const shouldAuth = await BiometricService.shouldAuthenticate();
+        if (shouldAuth) {
+          setNeedsBiometricAuth(true);
+          setBiometricChecked(true);
+          setIsLoggedIn(false); // Temporarily set to false until biometric auth
+          setIsLoading(false);
+          return false;
+        }
+        setBiometricChecked(true);
+      }
+      
       // Always update state to force re-render
       setIsLoggedIn(loggedIn);
       setIsLoading(false);
+      
+      // Reset biometric states if user is not logged in
+      if (!loggedIn) {
+        setNeedsBiometricAuth(false);
+        setBiometricChecked(false);
+      }
       
       return loggedIn;
     } catch (e) {
@@ -66,7 +95,14 @@ export default function AppNavigator() {
       setIsLoading(false);
       return false;
     }
-  }, []);
+  }, [biometricChecked]);
+
+  const handleBiometricAuthenticated = async () => {
+    // Record the current time as last successful authentication
+    await AsyncStorage.setItem('@budgetwise_last_auth_time', Date.now().toString());
+    setNeedsBiometricAuth(false);
+    setIsLoggedIn(true);
+  };
 
   const handleSplashComplete = () => {
     setShowSplash(false);
@@ -77,51 +113,57 @@ export default function AppNavigator() {
     // Don't start checking login until splash is complete
     if (showSplash) return;
     
+    // Only check once initially, then rely on navigation triggers
     checkLoginStatus();
-    
-    // Add a more frequent check during the first few seconds after component mount
-    const intervalId = setInterval(checkLoginStatus, 500); // Check every 500ms for faster response
-    
-    const timeoutId = setTimeout(() => {
-      clearInterval(intervalId);
-      // Continue with less frequent checks for long-term stability
-      const slowInterval = setInterval(checkLoginStatus, 2000); // Check every 2 seconds
-      
-      const longTimeoutId = setTimeout(() => {
-        clearInterval(slowInterval);
-      }, 30000); // Stop after 30 seconds
-      
-      return () => clearInterval(slowInterval);
-    }, 5000); // Fast checking for 5 seconds
-    
-    return () => {
-      clearInterval(intervalId);
-      clearTimeout(timeoutId);
-    };
   }, [checkLoginStatus, showSplash]);
 
-  // Listen for app state changes to recheck login status
+  // Listen for app state changes to recheck login status and biometric auth
   useEffect(() => {
-    const handleAppStateChange = (nextAppState: string) => {
-      if (nextAppState === 'active') {
-        checkLoginStatus();
+    const handleAppStateChange = async (nextAppState: string) => {
+      if (nextAppState === 'active' && isLoggedIn && !needsBiometricAuth) {
+        // Only require biometric auth again if the app has been in background for more than 1 minute
+        const lastAuthTime = await AsyncStorage.getItem('@budgetwise_last_auth_time');
+        const currentTime = Date.now();
+        const ONE_MINUTE = 60 * 1000; // 1 minute in milliseconds
+        
+        if (lastAuthTime) {
+          const timeSinceAuth = currentTime - parseInt(lastAuthTime);
+          if (timeSinceAuth > ONE_MINUTE) {
+            // App has been inactive for more than 1 minute, require biometric auth
+            setBiometricChecked(false);
+            const shouldAuth = await BiometricService.shouldAuthenticate();
+            if (shouldAuth) {
+              setNeedsBiometricAuth(true);
+              setIsLoggedIn(false); // Require biometric auth again
+            }
+          }
+        } else {
+          // No last auth time recorded, require auth
+          setBiometricChecked(false);
+          const shouldAuth = await BiometricService.shouldAuthenticate();
+          if (shouldAuth) {
+            setNeedsBiometricAuth(true);
+            setIsLoggedIn(false);
+          }
+        }
       }
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     
-    // Also listen for storage changes (like after login)
+    // Listen for login/logout triggers from other screens (like LoginScreen, DashboardScreen)
     const checkForNavigationTrigger = setInterval(async () => {
       try {
         const trigger = await AsyncStorage.getItem('@budgetwise_navigation_trigger');
         if (trigger) {
           await AsyncStorage.removeItem('@budgetwise_navigation_trigger');
+          console.log('🔄 Navigation trigger detected - rechecking login status');
           checkLoginStatus();
         }
       } catch (e) {
         // Ignore errors
       }
-    }, 500);
+    }, 1000); // Check every 1 second (less aggressive than before)
     
     return () => {
       subscription?.remove();
@@ -145,10 +187,22 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator
         id={undefined}
-        initialRouteName={isLoggedIn ? 'MainTabs' : 'Home'}
+        initialRouteName={
+          needsBiometricAuth ? 'BiometricAuth' : 
+          isLoggedIn ? 'MainTabs' : 'Home'
+        }
         screenOptions={{ headerShown: false }}
       >
-        {isLoggedIn ? (
+        {needsBiometricAuth ? (
+          // Biometric authentication required
+          <Stack.Screen name="BiometricAuth">
+            {() => (
+              <BiometricAuthScreen 
+                onAuthenticated={handleBiometricAuthenticated}
+              />
+            )}
+          </Stack.Screen>
+        ) : isLoggedIn ? (
           // Logged in users - only app screens, no auth screens
           <>
             <Stack.Screen name="MainTabs" component={MainTabNavigator} />
@@ -182,6 +236,22 @@ export default function AppNavigator() {
             <Stack.Screen 
               name="Settings" 
               component={SettingsScreen}
+              options={{
+                presentation: 'modal',
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen 
+              name="NotificationSettings" 
+              component={NotificationSettingsScreen}
+              options={{
+                presentation: 'modal',
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen 
+              name="BiometricSettings" 
+              component={BiometricSettingsScreen}
               options={{
                 presentation: 'modal',
                 headerShown: false,

@@ -1,0 +1,32 @@
+{
+  "cli": {
+    "version": ">= 5.2.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "gradleCommand": ":app:assembleDebug"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "applicationArchivePath": "BudgetWise-v1.0.2.apk"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle",
+        "applicationArchivePath": "BudgetWise-v1.0.2.aab"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

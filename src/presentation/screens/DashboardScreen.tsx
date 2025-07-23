@@ -10,6 +10,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { expenseAPI, userAPI, depositAPI } from '../../data/services/api';
 import { TokenManager } from '../../data/TokenManager';
 import ContextIndicator from '../components/ContextIndicator';
+import AdaptiveStatusBar from '../components/AdaptiveStatusBar';
 
 type DashboardScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Dashboard'>;
 
@@ -94,6 +95,9 @@ export default function DashboardScreen({ navigation }: Props) {
     income: 0,
     expense: 0,
   });
+
+  // Network error state
+  const [networkError, setNetworkError] = useState(false);
   
   // Search functionality state
   const [searchQuery, setSearchQuery] = useState('');
@@ -134,11 +138,12 @@ export default function DashboardScreen({ navigation }: Props) {
       
       if (!token) {
         console.log('❌ No token available - user may need to login again');
-        // Fall back to demo data when no token
-        setExpenses(demoTransactions);
+        // Show network error instead of demo data
+        setNetworkError(true);
+        setExpenses([]);
         setDeposits([]);
-        setAllTransactions(demoTransactions);
-        setBalance(demoBalance);
+        setAllTransactions([]);
+        setBalance({ total: 0, income: 0, expense: 0 });
         return;
       }
       
@@ -269,28 +274,84 @@ export default function DashboardScreen({ navigation }: Props) {
         expense: totalExpense,
       });
       
+      // Clear network error state on successful fetch
+      setNetworkError(false);
+      
+      // Notification triggers - check spending patterns and send alerts
+      try {
+        const { NotificationService } = await import('../../services/NotificationService');
+        
+        // Check for low balance
+        await NotificationService.checkAndNotifyBalance(totalIncome - totalExpense);
+        
+        // Check for large expenses
+        for (const expense of transformedExpenses) {
+          const amount = Math.abs(expense.amount);
+          if (amount > 0) {
+            await NotificationService.checkAndNotifySpending(amount, expense.category);
+          }
+        }
+        
+        // Check weekly summary (if it's Monday and we have data)
+        const today = new Date();
+        if (today.getDay() === 1 && allTransactions.length > 0) { // Monday
+          // Calculate weekly totals (last 7 days)
+          const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+          const weeklyTransactions = allTransactions.filter(t => 
+            new Date(t.originalData.createdAt) >= weekAgo
+          );
+          
+          const weeklyExpenses = weeklyTransactions
+            .filter(t => t.type === 'expense')
+            .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+          
+          const weeklyIncome = weeklyTransactions
+            .filter(t => t.type === 'deposit')
+            .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+          
+          if (weeklyTransactions.length > 0) {
+            await NotificationService.sendWeeklySummary(
+              weeklyExpenses, 
+              weeklyIncome, 
+              weeklyTransactions.length
+            );
+          }
+        }
+        
+        // Send motivational notifications based on spending patterns
+        if (totalExpense === 0 && today.getHours() > 18) {
+          // No expenses logged and it's evening
+          await NotificationService.sendMotivationalNotification('no_expenses');
+        } else if (totalIncome > totalExpense && totalExpense > 0) {
+          // Good spending habits
+          await NotificationService.sendMotivationalNotification('good_spending');
+        }
+        
+      } catch (notificationError) {
+        console.log('⚠️ Notifications not available in current environment:', notificationError);
+      }
+      
       console.log('✅ Dashboard data updated with expenses and deposits');
     } catch (error: any) {
       console.log('❌ Error fetching transactions:', error);
-      
+
       // Check if it's a 401 error specifically
       if (error.response?.status === 401) {
         console.log('🔒 Authentication failed - token may be expired');
         console.log('💡 Running token diagnostics...');
-        
         // Debug token information
         await TokenManager.debugTokens();
-        
         // Optional: Clear invalid tokens and redirect to login
         // await TokenManager.clearAllTokens();
         // navigation.navigate('Login');
       }
-      
-      // Fall back to demo data on error
-      setExpenses(demoTransactions);
+
+      // Show network error instead of demo data
+      setNetworkError(true);
+      setExpenses([]);
       setDeposits([]);
-      setAllTransactions(demoTransactions);
-      setBalance(demoBalance);
+      setAllTransactions([]);
+      setBalance({ total: 0, income: 0, expense: 0 });
     } finally {
       if (showLoading) setLoading(false);
       setRefreshing(false);
@@ -423,6 +484,20 @@ export default function DashboardScreen({ navigation }: Props) {
     
     fetchUserData();
     fetchTransactions(); // Fetch expenses and deposits on component mount
+    
+    // Initialize notifications
+    const initNotifications = async () => {
+      try {
+        const { NotificationService } = await import('../../services/NotificationService');
+        await NotificationService.initialize();
+        NotificationService.setupNotificationListeners();
+        console.log('✅ Notifications initialized');
+      } catch (error) {
+        console.log('⚠️ Notifications not available in current environment:', error);
+      }
+    };
+    
+    initNotifications();
   }, []);
 
   // Update filtered expenses when allTransactions change
@@ -536,6 +611,7 @@ export default function DashboardScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
+      <AdaptiveStatusBar backgroundColor="#F0F8FF" />
       <ScrollView
         refreshControl={
           <RefreshControl
@@ -612,7 +688,13 @@ export default function DashboardScreen({ navigation }: Props) {
 
         {/* Recent Transactions */}
         <Text style={styles.recentTitle}>Recent Transactions</Text>
-        {filteredExpenses.length === 0 && !loading ? (
+        {networkError ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="cloud-offline" size={48} color="#FF7A7A" />
+            <Text style={styles.emptyStateText}>Network Issue</Text>
+            <Text style={styles.emptyStateSubtext}>Unable to connect to server. Please check your internet connection and try again.</Text>
+          </View>
+        ) : filteredExpenses.length === 0 && !loading ? (
           <View style={styles.emptyState}>
             <Ionicons name="receipt-outline" size={48} color="#B0B0B0" />
             <Text style={styles.emptyStateText}>
@@ -644,8 +726,10 @@ export default function DashboardScreen({ navigation }: Props) {
       </TouchableOpacity>
       <CustomPopup 
         visible={logoutPopup.visible}
-        message="Are you sure you want to logout?"
+        title="Logout Confirmation"
+        message="Are you sure you want to logout? You'll need to sign in again to access your budget data."
         type="confirm"
+        confirmText="Logout"
         onClose={handleLogoutCancel}
         onConfirm={handleLogout}
       />

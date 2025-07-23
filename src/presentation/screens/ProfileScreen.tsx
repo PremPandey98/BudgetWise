@@ -576,7 +576,7 @@ export default function ProfileScreen() {
               />
             </View>
             <View style={styles.modalInputContainer}>
-              <Text style={styles.modalInputLabel}>Password <Text style={{color:'#B0B0B0',fontWeight:'400'}}>(Optional)</Text></Text>
+              <Text style={styles.modalInputLabel}>Password </Text>
               <TextInput
                 ref={groupPasswordInputRef}
                 style={styles.modalInput}

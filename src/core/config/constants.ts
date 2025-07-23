@@ -3,9 +3,15 @@ export const API_CONFIG = {
   // Your server is running on:
   // HTTP: http://0.0.0.0:5091 
   // HTTPS: https://0.0.0.0:7090
-  BASE_URL: __DEV__ 
-    ? getDevBaseUrl()  // Dynamic URL based on platform/device
-    : 'https://your-production-api.com/api', // Production URL
+  
+  // FORCE PRODUCTION API FOR DEVELOPMENT TESTING
+  BASE_URL: 'https://budgetwiseapi-001-site1.rtempurl.com', // Always use production API
+  
+  // Uncomment below to use local development server:
+  // BASE_URL: __DEV__ 
+  //   ? getDevBaseUrl()  // Dynamic URL based on platform/device
+  //   : 'https://budgetwiseapi-001-site1.rtempurl.com', // Production URL
+  
   TIMEOUT: 30000, // 30 seconds (increased for better network handling)
   HEADERS: {
     'Content-Type': 'application/json',
@@ -117,24 +123,28 @@ export const testNetworkConnection = async (): Promise<boolean> => {
     });
     
     console.log('✅ Connection test successful, status:', response.status);
-    return true;
+    return response.ok;
   } catch (error) {
     console.log('❌ Connection test failed:', error);
     
-    // Test basic connectivity
-    try {
-      const basicUrl = getDevBaseUrl();
-      console.log('🔍 Testing basic connectivity to:', basicUrl);
-      
-      const basicResponse = await fetch(basicUrl, {
-        method: 'GET',
-      });
-      
-      console.log('✅ Basic connectivity works, server is reachable');
-      return true;
-    } catch (basicError) {
-      console.log('❌ Basic connectivity failed:', basicError);
-      return false;
+    // Test basic connectivity only in development
+    if (__DEV__) {
+      try {
+        const basicUrl = getDevBaseUrl();
+        console.log('🔍 Testing basic connectivity to:', basicUrl);
+        
+        const basicResponse = await fetch(basicUrl, {
+          method: 'GET',
+        });
+        
+        console.log('✅ Basic connectivity works, server is reachable');
+        return true;
+      } catch (basicError) {
+        console.log('❌ Basic connectivity failed:', basicError);
+        return false;
+      }
     }
+    
+    return false;
   }
 };

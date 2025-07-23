@@ -11,9 +11,13 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialIcons, FontAwesome } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_CONFIG } from '../../core/config/constants';
 import CustomPopup, { PopupType } from '../components/CustomPopup';
+
+type SettingsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function SettingsScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -25,7 +29,7 @@ export default function SettingsScreen() {
     { visible: false, message: '', type: 'info' }
   );
   
-  const navigation = useNavigation();
+  const navigation = useNavigation<SettingsScreenNavigationProp>();
 
   // Load settings from storage
   useEffect(() => {
@@ -199,7 +203,7 @@ export default function SettingsScreen() {
   const handleAbout = () => {
     Alert.alert(
       'About BudgetWise',
-      'BudgetWise v1.0.0\n\nA simple and powerful expense tracking app for individuals and groups.\n\nDeveloped by Akshay and Prem ',
+      'BudgetWise v1.0.2\n\nA simple and powerful expense tracking app for individuals and groups.\n\nDeveloped by Akshay and Prem ',
       [{ text: 'OK' }]
     );
   };
@@ -220,41 +224,37 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Preferences</Text>
           
-          <View style={styles.settingItem}>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => navigation.navigate('NotificationSettings')}
+          >
             <View style={styles.settingLeft}>
               <View style={[styles.settingIcon, { backgroundColor: '#00C897' }]}>
                 <Ionicons name="notifications" size={20} color="#fff" />
               </View>
               <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Notifications</Text>
-                <Text style={styles.settingSubtitle}>Get notified about expenses and reminders</Text>
+                <Text style={styles.settingTitle}>Notification Settings</Text>
+                <Text style={styles.settingSubtitle}>Manage alerts, reminders, and reports</Text>
               </View>
             </View>
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={handleNotificationToggle}
-              trackColor={{ false: '#E5E7EB', true: '#00C897' }}
-              thumbColor={notificationsEnabled ? '#fff' : '#f4f3f4'}
-            />
-          </View>
+            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+          </TouchableOpacity>
 
-          <View style={styles.settingItem}>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => navigation.navigate('BiometricSettings')}
+          >
             <View style={styles.settingLeft}>
               <View style={[styles.settingIcon, { backgroundColor: '#6C63FF' }]}>
                 <Ionicons name="finger-print" size={20} color="#fff" />
               </View>
               <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Biometric Authentication</Text>
-                <Text style={styles.settingSubtitle}>Use fingerprint or face ID to unlock</Text>
+                <Text style={styles.settingTitle}>Biometric Security</Text>
+                <Text style={styles.settingSubtitle}>Fingerprint, Face ID & authentication settings</Text>
               </View>
             </View>
-            <Switch
-              value={biometricEnabled}
-              onValueChange={handleBiometricToggle}
-              trackColor={{ false: '#E5E7EB', true: '#6C63FF' }}
-              thumbColor={biometricEnabled ? '#fff' : '#f4f3f4'}
-            />
-          </View>
+            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+          </TouchableOpacity>
 
           <View style={styles.settingItem}>
             <View style={styles.settingLeft}>
@@ -387,7 +387,7 @@ export default function SettingsScreen() {
               </View>
               <View style={styles.settingText}>
                 <Text style={styles.settingTitle}>About BudgetWise</Text>
-                <Text style={styles.settingSubtitle}>Version 1.0.0</Text>
+                <Text style={styles.settingSubtitle}>Version 1.0.2</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#B0B0B0" />

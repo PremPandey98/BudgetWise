@@ -63,9 +63,6 @@ export default function HomeScreen({ navigation }: any) {
           >
             <Text style={styles.registerButtonText}>Get Started Free</Text>
           </TouchableOpacity>
-          <Text style={styles.ctaSubtext}>
-            Join thousands of users who have already taken control of their finances
-          </Text>
         </View>
       </ScrollView>
     </View>

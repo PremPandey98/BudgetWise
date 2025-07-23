@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { userAPI } from '../../data/services/api';
@@ -8,6 +8,7 @@ import CustomPopup, { PopupType } from '../components/CustomPopup';
 import CustomToast, { ToastType } from '../components/CustomToast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_CONFIG } from '../../core/config/constants';
+import AdaptiveStatusBar from '../components/AdaptiveStatusBar';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
@@ -141,6 +142,7 @@ export default function LoginScreen({ navigation }: Props) {
 
   return (
     <>
+      <AdaptiveStatusBar backgroundColor="#4A90E2" />
       <CustomToast visible={toast.visible} message={toast.message} type={toast.type} />
       <CustomPopup visible={popup.visible} message={popup.message} type={popup.type} onClose={closePopup} />
       <KeyboardAvoidingView 
