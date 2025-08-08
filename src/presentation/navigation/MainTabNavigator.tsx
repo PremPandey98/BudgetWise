@@ -7,6 +7,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import ExpenseAnalyticsScreen from '../screens/ExpenseAnalyticsScreen';
 import TransactionsScreen from '../screens/TransactionsScreen';
 import { View, Text } from 'react-native';
+import { useTheme } from '../../core/theme/ThemeContext';
 
 // Placeholder screens for Deposit
 function DepositScreen() {
@@ -16,27 +17,29 @@ function DepositScreen() {
 const Tab = createBottomTabNavigator();
 
 export default function MainTabNavigator() {
+  const { theme } = useTheme();
+  
   return (
     <Tab.Navigator
       id={undefined}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: 'rgba(74, 144, 226, 0.95)',
-          borderTopColor: '#4A90E2',
+          backgroundColor: theme.colors.card,
+          borderTopColor: theme.colors.surface,
           height: 64,
           marginHorizontal: 0,
           marginBottom: 0,
           borderRadius: 0, // Remove curve
-          shadowColor: '#4A90E2',
+          shadowColor: theme.colors.primary,
           shadowOffset: { width: 0, height: 6 },
           shadowOpacity: 0.18,
           shadowRadius: 16,
           elevation: 12,
         },
         tabBarShowLabel: false,
-        tabBarActiveTintColor: '#fff',
-        tabBarInactiveTintColor: '#fff',
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.textSecondary,
         tabBarIconStyle: {
           alignItems: 'center',
           justifyContent: 'center',
@@ -49,15 +52,15 @@ export default function MainTabNavigator() {
           display: 'flex',
         },
         tabBarIcon: ({ focused, color, size }) => {
-          const iconColor = '#fff';
+          const iconColor = focused ? theme.colors.primary : theme.colors.textSecondary;
           if (route.name === 'Home') {
-            return <Ionicons name="home" size={28} color={iconColor} style={{ alignSelf: 'center' }} />;
+            return <Ionicons name={focused ? "home" : "home-outline"} size={28} color={iconColor} style={{ alignSelf: 'center' }} />;
           } else if (route.name === 'Expense') {
             return <MaterialIcons name="bar-chart" size={26} color={iconColor} style={{ alignSelf: 'center' }} />;
           } else if (route.name === 'Transactions') {
-            return <Ionicons name="list" size={26} color={iconColor} style={{ alignSelf: 'center' }} />;
+            return <Ionicons name={focused ? "list" : "list-outline"} size={26} color={iconColor} style={{ alignSelf: 'center' }} />;
           } else if (route.name === 'Profile') {
-            return <Ionicons name="person-outline" size={26} color={iconColor} style={{ alignSelf: 'center' }} />;
+            return <Ionicons name={focused ? "person" : "person-outline"} size={26} color={iconColor} style={{ alignSelf: 'center' }} />;
           }
         },
       })}

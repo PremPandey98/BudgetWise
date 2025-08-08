@@ -18,6 +18,9 @@ import { expenseAPI, depositAPI } from '../../data/services/api';
 import { TokenManager } from '../../data/TokenManager';
 import CustomPopup, { PopupType } from '../components/CustomPopup';
 import ContextIndicator from '../components/ContextIndicator';
+import NetworkStatusBar from '../components/NetworkStatusBar';
+import { useTheme } from '../../core/theme/ThemeContext';
+import { offlineManager } from '../../services/OfflineManager';
 
 interface Transaction {
   id: number | string;
@@ -48,9 +51,26 @@ export default function TransactionsScreen() {
   const [popup, setPopup] = useState<{visible: boolean, message: string, type: PopupType}>({
     visible: false, message: '', type: 'info'
   });
+  const { theme } = useTheme();
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [isApiConnected, setIsApiConnected] = useState(true); // Track API connection status
+  const [isOnline, setIsOnline] = useState(true);
+
+  // Network status monitoring
+  useEffect(() => {
+    // Subscribe to network status changes
+    const unsubscribe = offlineManager.onNetworkStatusChange((online) => {
+      setIsOnline(online);
+      setIsApiConnected(online);
+    });
+
+    // Get initial network status
+    setIsOnline(offlineManager.getNetworkStatus());
+    setIsApiConnected(offlineManager.getNetworkStatus());
+
+    return unsubscribe;
+  }, []);
 
   // Category mapping function
   const getCategoryName = (categoryId: number): string => {
@@ -79,37 +99,17 @@ export default function TransactionsScreen() {
     if (showLoading) setLoading(true);
     
     try {
-      const token = await TokenManager.getCurrentToken();
-      if (!token) {
-        showPopup('Please login to view transactions', 'error');
-        setIsApiConnected(false);
-        return;
-      }
+      console.log('🔄 Fetching transactions using offline manager...');
+      
+      const { expenses: expensesList, deposits: depositsList } = await offlineManager.getAllTransactions();
+      
+      console.log('✅ Offline manager data loaded:', {
+        expenses: expensesList.length,
+        deposits: depositsList.length
+      });
 
-      // Fetch both expenses and deposits
-      const [expensesResponse, depositsResponse] = await Promise.all([
-        expenseAPI.getAllRelatedExpenseRecords(token),
-        depositAPI.getAllRelatedDeposits(token)
-      ]);
-
-      // If we reach here, API is connected
+      // If we reach here, API is connected or we have offline data
       setIsApiConnected(true);
-
-      // Process expenses
-      let expensesList = [];
-      if (expensesResponse && expensesResponse.$values) {
-        expensesList = expensesResponse.$values;
-      } else if (Array.isArray(expensesResponse)) {
-        expensesList = expensesResponse;
-      }
-
-      // Process deposits
-      let depositsList = [];
-      if (depositsResponse && depositsResponse.$values) {
-        depositsList = depositsResponse.$values;
-      } else if (Array.isArray(depositsResponse)) {
-        depositsList = depositsResponse;
-      }
 
       // Convert to unified transaction format
       const expenseTransactions: Transaction[] = expensesList.map((expense, index) => {
@@ -260,61 +260,33 @@ export default function TransactionsScreen() {
   const handleUpdate = async () => {
     if (!editingTransaction) return;
 
-    // Only allow updates for transactions with numeric IDs (real database records)
-    if (typeof editingTransaction.id !== 'number') {
-      showPopup('Cannot update this transaction', 'error');
-      return;
-    }
-
     try {
-      const token = await TokenManager.getCurrentToken();
-      if (!token) {
-        showPopup('Authentication required', 'error');
-        return;
-      }
+      const updatedData = {
+        id: editingTransaction.id,
+        amount: parseFloat(editAmount),
+        description: editDescription,
+      };
 
-      // Create update data based on transaction type
-      let updatedData;
+      console.log('🔄 Updating transaction via offline manager:', updatedData);
       
-      if (editingTransaction.type === 'expense') {
-        // Start with original data and update only the changed fields
-        updatedData = {
-          ...editingTransaction.originalData,
-          ExpenseId: editingTransaction.id,
-          Amount: parseFloat(editAmount),
-          Description: editDescription,
-        };
-        
-        console.log('🔄 Updating expense:', updatedData);
-        await expenseAPI.updateExpense(editingTransaction.id, updatedData, token);
-      } else {
-        // Start with original data and update only the changed fields
-        // Ensure we include the Tittle field if it exists in original data
-        updatedData = {
-          ...editingTransaction.originalData,
-          DepositId: editingTransaction.id,
-          Amount: parseFloat(editAmount),
-          Description: editDescription,
-          // Include Tittle if it exists in original data or use description as fallback
-          Tittle: editingTransaction.originalData?.Tittle || 
-                  editingTransaction.originalData?.tittle || 
-                  editDescription ||
-                  'Deposit',
-        };
-        
-        console.log('🔄 Updating deposit:', updatedData);
-        await depositAPI.updateDeposit(editingTransaction.id, updatedData, token);
-      }
+      const result = await offlineManager.updateTransaction(
+        editingTransaction.type,
+        editingTransaction.id,
+        updatedData
+      );
 
-      setEditModalVisible(false);
-      setEditingTransaction(null);
-      showPopup('Transaction updated successfully', 'success');
-      fetchTransactions(false);
+      if (result.success) {
+        setEditModalVisible(false);
+        setEditingTransaction(null);
+        showPopup('Transaction updated successfully', 'success');
+        fetchTransactions(false);
+      } else {
+        showPopup(result.error || 'Failed to update transaction', 'error');
+      }
 
     } catch (error: any) {
       console.error('❌ Error updating transaction:', error);
-      const errorMessage = error?.response?.data?.message || error?.response?.data || 'Failed to update transaction';
-      showPopup(errorMessage, 'error');
+      showPopup('Failed to update transaction', 'error');
     }
   };
 
@@ -339,22 +311,21 @@ export default function TransactionsScreen() {
     if (!transactionToDelete) return;
 
     try {
-      const token = await TokenManager.getCurrentToken();
-      if (!token) {
-        showPopup('Authentication required', 'error');
-        return;
-      }
+      console.log('🗑️ Deleting transaction via offline manager:', transactionToDelete.id);
+      
+      const result = await offlineManager.deleteTransaction(
+        transactionToDelete.type,
+        transactionToDelete.id
+      );
 
-      if (transactionToDelete.type === 'expense') {
-        await expenseAPI.deleteExpense(transactionToDelete.id as number, token);
+      if (result.success) {
+        setDeleteModalVisible(false);
+        setTransactionToDelete(null);
+        showPopup('Transaction deleted successfully', 'success');
+        fetchTransactions(false);
       } else {
-        await depositAPI.deleteDeposit(transactionToDelete.id as number, token);
+        showPopup(result.error || 'Failed to delete transaction', 'error');
       }
-
-      setDeleteModalVisible(false);
-      setTransactionToDelete(null);
-      showPopup('Transaction deleted successfully', 'success');
-      fetchTransactions(false);
 
     } catch (error) {
       console.error('❌ Error deleting transaction:', error);
@@ -394,7 +365,7 @@ export default function TransactionsScreen() {
     const isExpense = item.type === 'expense';
     
     return (
-      <View style={styles.transactionCard}>
+      <View style={[styles.transactionCard, { backgroundColor: theme.colors.card }]}>
         {/* Left Color Accent */}
         <View style={[
           styles.colorAccent,
@@ -408,7 +379,7 @@ export default function TransactionsScreen() {
               {/* Transaction Icon */}
               <View style={[
                 styles.transactionIcon,
-                { backgroundColor: isExpense ? '#FFE8EA' : '#E8F8F5' }
+                { backgroundColor: isExpense ? (theme.isDark ? 'rgba(255, 71, 87, 0.2)' : '#FFE8EA') : (theme.isDark ? 'rgba(46, 213, 115, 0.2)' : '#E8F8F5') }
               ]}>
                 <Ionicons 
                   name={isExpense ? 'remove-circle' : 'add-circle'} 
@@ -419,18 +390,18 @@ export default function TransactionsScreen() {
               
               {/* Transaction Details */}
               <View style={styles.transactionDetails}>
-                <Text style={styles.description} numberOfLines={2}>
+                <Text style={[styles.description, { color: theme.colors.primary }]} numberOfLines={2}>
                   {item.description}
                 </Text>
                 <View style={styles.metaRow}>
-                  <Text style={styles.dateText}>{formatDate(item.date)}</Text>
-                  <Text style={styles.metaSeparator}>•</Text>
-                  <Text style={styles.timeText}>{formatTime(item.date)}</Text>
+                  <Text style={[styles.dateText, { color: theme.colors.secondary }]}>{formatDate(item.date)}</Text>
+                  <Text style={[styles.metaSeparator, { color: theme.colors.textSecondary }]}>•</Text>
+                  <Text style={[styles.timeText, { color: theme.colors.textSecondary }]}>{formatTime(item.date)}</Text>
                   {item.category && (
                     <>
-                      <Text style={styles.metaSeparator}>•</Text>
-                      <View style={styles.categoryChip}>
-                        <Text style={styles.categoryText}>{item.category}</Text>
+                      <Text style={[styles.metaSeparator, { color: theme.colors.textSecondary }]}>•</Text>
+                      <View style={[styles.categoryChip, { backgroundColor: theme.colors.surface }]}>
+                        <Text style={[styles.categoryText, { color: theme.colors.primary }]}>{item.category}</Text>
                       </View>
                     </>
                   )}
@@ -475,6 +446,7 @@ export default function TransactionsScreen() {
               style={[
                 styles.actionButton,
                 styles.editButton,
+                { backgroundColor: theme.isDark ? 'rgba(0, 122, 255, 0.15)' : '#EBF4FF' },
                 (!canEdit || !isApiConnected) && styles.disabledButton
               ]}
               onPress={() => handleEdit(item)}
@@ -497,6 +469,7 @@ export default function TransactionsScreen() {
               style={[
                 styles.actionButton,
                 styles.deleteButton,
+                { backgroundColor: theme.isDark ? 'rgba(255, 59, 48, 0.15)' : '#FEF2F2' },
                 (!canEdit || !isApiConnected) && styles.disabledButton
               ]}
               onPress={() => handleDelete(item)}
@@ -522,20 +495,20 @@ export default function TransactionsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4A90E2" />
-        <Text style={styles.loadingText}>Loading transactions...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={[styles.loadingText, { color: theme.colors.primary }]}>Loading transactions...</Text>
       </View>
     );
   }
 
   return (
     <>
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Transactions</Text>
-          <Text style={styles.headerSubtitle}>Manage your expenses and deposits</Text>
+          <Text style={[styles.headerTitle, { color: theme.colors.secondary }]}>Transactions</Text>
+          <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>Manage your expenses and deposits</Text>
         </View>
 
         {/* Context Indicator */}
@@ -543,14 +516,14 @@ export default function TransactionsScreen() {
 
         {/* Search and Filter */}
         <View style={styles.searchContainer}>
-          <View style={styles.searchInputContainer}>
-            <Ionicons name="search" size={20} color="#4A90E2" style={styles.searchIcon} />
+          <View style={[styles.searchInputContainer, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+            <Ionicons name="search" size={20} color={theme.colors.textSecondary} style={styles.searchIcon} />
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: theme.colors.text }]}
               placeholder="Search transactions..."
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.colors.placeholder}
             />
           </View>
         </View>
@@ -558,26 +531,50 @@ export default function TransactionsScreen() {
         {/* Filter Buttons */}
         <View style={styles.filterContainer}>
           <TouchableOpacity
-            style={[styles.filterButton, filterType === 'all' && styles.activeFilter]}
+            style={[
+              styles.filterButton, 
+              { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
+              filterType === 'all' && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
+            ]}
             onPress={() => setFilterType('all')}
           >
-            <Text style={[styles.filterText, filterType === 'all' && styles.activeFilterText]}>
+            <Text style={[
+              styles.filterText,
+              { color: theme.colors.secondary },
+              filterType === 'all' && { color: theme.colors.card }
+            ]}>
               All
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.filterButton, filterType === 'expenses' && styles.activeFilter]}
+            style={[
+              styles.filterButton,
+              { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
+              filterType === 'expenses' && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
+            ]}
             onPress={() => setFilterType('expenses')}
           >
-            <Text style={[styles.filterText, filterType === 'expenses' && styles.activeFilterText]}>
+            <Text style={[
+              styles.filterText,
+              { color: theme.colors.secondary },
+              filterType === 'expenses' && { color: theme.colors.card }
+            ]}>
               Expenses
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.filterButton, filterType === 'deposits' && styles.activeFilter]}
+            style={[
+              styles.filterButton,
+              { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
+              filterType === 'deposits' && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
+            ]}
             onPress={() => setFilterType('deposits')}
           >
-            <Text style={[styles.filterText, filterType === 'deposits' && styles.activeFilterText]}>
+            <Text style={[
+              styles.filterText,
+              { color: theme.colors.secondary },
+              filterType === 'deposits' && { color: theme.colors.card }
+            ]}>
               Deposits
             </Text>
           </TouchableOpacity>
@@ -595,9 +592,9 @@ export default function TransactionsScreen() {
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Ionicons name="receipt-outline" size={64} color="#B0B0B0" />
-              <Text style={styles.emptyStateText}>No transactions found</Text>
-              <Text style={styles.emptyStateSubtext}>
+              <Ionicons name="receipt-outline" size={64} color={theme.colors.secondary} />
+              <Text style={[styles.emptyStateText, { color: theme.colors.primary }]}>No transactions found</Text>
+              <Text style={[styles.emptyStateSubtext, { color: theme.colors.secondary }]}>
                 {searchQuery || filterType !== 'all' 
                   ? 'Try adjusting your search or filter' 
                   : 'Start by adding some expenses or deposits'}
@@ -608,10 +605,10 @@ export default function TransactionsScreen() {
 
         {/* Add Transaction Button */}
         <TouchableOpacity
-          style={styles.addButton}
+          style={[styles.addButton, { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary }]}
           onPress={() => navigation.navigate('AddExpense' as never)}
         >
-          <Ionicons name="add" size={28} color="#FFFFFF" />
+          <Ionicons name="add" size={28} color={theme.isDark ? '#222' : '#FFFFFF'} />
         </TouchableOpacity>
       </View>
 
@@ -623,19 +620,19 @@ export default function TransactionsScreen() {
         onRequestClose={() => setEditModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
+          <View style={[styles.modalContainer, { backgroundColor: theme.colors.card }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Transaction</Text>
+              <Text style={[styles.modalTitle, { color: theme.colors.primary }]}>Edit Transaction</Text>
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setEditModalVisible(false)}
               >
-                <Ionicons name="close" size={24} color="#666" />
+                <Ionicons name="close" size={24} color={theme.colors.secondary} />
               </TouchableOpacity>
             </View>
             
             {editingTransaction && (
-              <View style={styles.transactionTypeHeader}>
+              <View style={[styles.transactionTypeHeader, { backgroundColor: theme.colors.surface }]}>
                 <Ionicons 
                   name={editingTransaction.type === 'expense' ? 'remove-circle' : 'add-circle'} 
                   size={20} 
@@ -652,28 +649,28 @@ export default function TransactionsScreen() {
             
             <View style={styles.modalContent}>
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Amount</Text>
-                <View style={styles.amountInputContainer}>
-                  <Text style={styles.currencySymbol}>₹</Text>
+                <Text style={[styles.inputLabel, { color: theme.colors.primary }]}>Amount</Text>
+                <View style={[styles.amountInputContainer, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}>
+                  <Text style={[styles.currencySymbol, { color: theme.colors.primary }]}>₹</Text>
                   <TextInput
-                    style={styles.amountInput}
+                    style={[styles.amountInput, { color: theme.colors.text }]}
                     value={editAmount}
                     onChangeText={setEditAmount}
                     keyboardType="numeric"
                     placeholder="0.00"
-                    placeholderTextColor="#999"
+                    placeholderTextColor={theme.colors.placeholder}
                   />
                 </View>
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Description</Text>
+                <Text style={[styles.inputLabel, { color: theme.colors.primary }]}>Description</Text>
                 <TextInput
-                  style={[styles.modalInput, styles.descriptionInput]}
+                  style={[styles.modalInput, styles.descriptionInput, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border, color: theme.colors.text }]}
                   value={editDescription}
                   onChangeText={setEditDescription}
                   placeholder="Enter description"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.colors.placeholder}
                   multiline
                   numberOfLines={3}
                   textAlignVertical="top"
@@ -683,14 +680,14 @@ export default function TransactionsScreen() {
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+                style={[styles.modalButton, styles.cancelButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
                 onPress={() => setEditModalVisible(false)}
               >
-                <Ionicons name="close-outline" size={20} color="#666" />
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Ionicons name="close-outline" size={20} color={theme.colors.secondary} />
+                <Text style={[styles.cancelButtonText, { color: theme.colors.secondary }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
+                style={[styles.modalButton, styles.saveButton, { backgroundColor: theme.colors.primary }]}
                 onPress={handleUpdate}
               >
                 <Ionicons name="checkmark-outline" size={20} color="#FFFFFF" />
@@ -709,23 +706,23 @@ export default function TransactionsScreen() {
         onRequestClose={() => setDeleteModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, styles.deleteModalContainer]}>
+          <View style={[styles.modalContainer, styles.deleteModalContainer, { backgroundColor: theme.colors.card }]}>
             <View style={styles.deleteIconContainer}>
               <Ionicons name="warning" size={48} color="#FF6B6B" />
             </View>
             
-            <Text style={styles.deleteModalTitle}>Delete Transaction</Text>
+            <Text style={[styles.deleteModalTitle, { color: theme.colors.primary }]}>Delete Transaction</Text>
             
             {transactionToDelete && (
               <View style={styles.deleteTransactionInfo}>
-                <Text style={styles.deleteModalText}>
+                <Text style={[styles.deleteModalText, { color: theme.colors.secondary }]}>
                   Are you sure you want to delete this {transactionToDelete.type}?
                 </Text>
-                <View style={styles.deleteTransactionDetails}>
+                <View style={[styles.deleteTransactionDetails, { backgroundColor: theme.colors.surface }]}>
                   <Text style={styles.deleteTransactionAmount}>
                     ₹{transactionToDelete.amount.toLocaleString()}
                   </Text>
-                  <Text style={styles.deleteTransactionDescription}>
+                  <Text style={[styles.deleteTransactionDescription, { color: theme.colors.secondary }]}>
                     {transactionToDelete.description}
                   </Text>
                 </View>
@@ -738,11 +735,11 @@ export default function TransactionsScreen() {
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+                style={[styles.modalButton, styles.cancelButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
                 onPress={() => setDeleteModalVisible(false)}
               >
-                <Ionicons name="close-outline" size={20} color="#666" />
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Ionicons name="close-outline" size={20} color={theme.colors.secondary} />
+                <Text style={[styles.cancelButtonText, { color: theme.colors.secondary }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, styles.deleteConfirmButton]}
@@ -769,34 +766,28 @@ export default function TransactionsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F8FF',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F0F8FF',
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#4A90E2',
   },
   header: {
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 20,
-    backgroundColor: '#4A90E2',
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#E6F3FF',
   },
   searchContainer: {
     paddingHorizontal: 20,
@@ -806,7 +797,6 @@ const styles = StyleSheet.create({
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     paddingHorizontal: 12,
     shadowColor: '#4A90E2',
@@ -822,7 +812,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#2C5282',
   },
   filterContainer: {
     flexDirection: 'row',
@@ -835,18 +824,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
   },
   activeFilter: {
-    backgroundColor: '#4A90E2',
     borderColor: '#4A90E2',
   },
   filterText: {
     fontSize: 14,
-    color: '#666',
     fontWeight: '600',
   },
   activeFilterText: {
@@ -857,7 +842,6 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   transactionCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     marginBottom: 12,
     marginHorizontal: 4,
@@ -902,7 +886,6 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1A1A1A',
     marginBottom: 6,
     lineHeight: 22,
   },
@@ -914,28 +897,23 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 13,
-    color: '#6B7280',
     fontWeight: '500',
   },
   timeText: {
     fontSize: 12,
-    color: '#9CA3AF',
     fontWeight: '400',
   },
   metaSeparator: {
     fontSize: 12,
-    color: '#D1D5DB',
     marginHorizontal: 2,
   },
   categoryChip: {
-    backgroundColor: '#F3F4F6',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
   },
   categoryText: {
     fontSize: 11,
-    color: '#374151',
     fontWeight: '600',
   },
   statusIndicator: {
@@ -975,16 +953,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 12,
-    backgroundColor: '#F8F9FA',
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
   editButton: {
-    backgroundColor: '#EBF4FF',
     borderColor: '#93C5FD',
   },
   deleteButton: {
-    backgroundColor: '#FEF2F2',
     borderColor: '#FECACA',
   },
   disabledButton: {
@@ -1020,14 +995,12 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 18,
-    color: '#2C5282',
     fontWeight: '600',
     marginTop: 16,
     textAlign: 'center',
   },
   emptyStateSubtext: {
     fontSize: 14,
-    color: '#4A90E2',
     marginTop: 8,
     textAlign: 'center',
     lineHeight: 20,
@@ -1041,7 +1014,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalContainer: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     paddingBottom: 24,
     width: '100%',
@@ -1061,7 +1033,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#2C5282',
   },
   closeButton: {
     padding: 4,
@@ -1071,7 +1042,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#F8F9FA',
   },
   transactionTypeText: {
     fontSize: 16,
@@ -1088,41 +1058,33 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2C5282',
     marginBottom: 8,
   },
   amountInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#E0E0E0',
     borderRadius: 12,
-    backgroundColor: '#F8F9FA',
     paddingHorizontal: 16,
     paddingVertical: 2,
   },
   currencySymbol: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#4A90E2',
     marginRight: 8,
   },
   amountInput: {
     flex: 1,
     fontSize: 18,
     fontWeight: '600',
-    color: '#2C5282',
     paddingVertical: 12,
   },
   modalInput: {
     borderWidth: 2,
-    borderColor: '#E0E0E0',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#2C5282',
-    backgroundColor: '#F8F9FA',
   },
   descriptionInput: {
     minHeight: 80,
@@ -1144,9 +1106,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cancelButton: {
-    backgroundColor: '#F0F0F0',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
   },
   saveButton: {
     backgroundColor: '#4A90E2',
@@ -1154,7 +1114,6 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#666',
   },
   saveButtonText: {
     fontSize: 16,
@@ -1172,7 +1131,6 @@ const styles = StyleSheet.create({
   deleteModalTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#2C5282',
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -1182,12 +1140,10 @@ const styles = StyleSheet.create({
   },
   deleteModalText: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     marginBottom: 16,
   },
   deleteTransactionDetails: {
-    backgroundColor: '#F8F9FA',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -1202,7 +1158,6 @@ const styles = StyleSheet.create({
   },
   deleteTransactionDescription: {
     fontSize: 14,
-    color: '#666',
     textAlign: 'center',
   },
   deleteWarningText: {

@@ -7,6 +7,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../core/theme/ThemeContext';
 
 interface AppLoadingScreenProps {
   message?: string;
@@ -15,6 +16,7 @@ interface AppLoadingScreenProps {
 export default function AppLoadingScreen({ 
   message = "Loading your financial data..." 
 }: AppLoadingScreenProps) {
+  const { theme } = useTheme();
   const spinValue = useRef(new Animated.Value(0)).current;
   const pulseValue = useRef(new Animated.Value(0)).current;
   const fadeValue = useRef(new Animated.Value(0)).current;
@@ -74,8 +76,11 @@ export default function AppLoadingScreen({
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor="#2C5282" />
-      <View style={styles.container}>
+      <StatusBar 
+        barStyle={theme.isDark ? "light-content" : "dark-content"} 
+        backgroundColor={theme.colors.background} 
+      />
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <Animated.View
           style={[
             styles.content,
@@ -89,10 +94,13 @@ export default function AppLoadingScreen({
                 styles.outerRing,
                 {
                   transform: [{ rotate: spin }, { scale: pulse }],
+                  borderColor: theme.isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)',
+                  borderTopColor: theme.colors.primary,
+                  backgroundColor: theme.isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
                 },
               ]}
             >
-              <Ionicons name="trending-up" size={40} color="#FFFFFF" />
+              <Ionicons name="trending-up" size={40} color={theme.colors.primary} />
             </Animated.View>
             
             <Animated.View
@@ -101,22 +109,23 @@ export default function AppLoadingScreen({
                 { transform: [{ rotate: spin }] },
               ]}
             >
-              <View style={[styles.loadingDot, styles.dot1]} />
-              <View style={[styles.loadingDot, styles.dot2]} />
-              <View style={[styles.loadingDot, styles.dot3]} />
+              <View style={[styles.loadingDot, styles.dot1, { backgroundColor: theme.colors.primary }]} />
+              <View style={[styles.loadingDot, styles.dot2, { backgroundColor: theme.colors.primary }]} />
+              <View style={[styles.loadingDot, styles.dot3, { backgroundColor: theme.colors.primary }]} />
             </Animated.View>
           </View>
 
           {/* Loading Text */}
           <View style={styles.textContainer}>
-            <Text style={styles.loadingMessage}>{message}</Text>
+            <Text style={[styles.loadingMessage, { color: theme.colors.text }]}>{message}</Text>
             <View style={styles.progressContainer}>
-              <View style={styles.progressBar}>
+              <View style={[styles.progressBar, { backgroundColor: theme.isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)' }]}>
                 <Animated.View
                   style={[
                     styles.progressFill,
                     {
                       transform: [{ scaleX: pulseValue }],
+                      backgroundColor: theme.colors.primary,
                     },
                   ]}
                 />
@@ -133,7 +142,7 @@ export default function AppLoadingScreen({
                 { transform: [{ rotate: spin }] },
               ]}
             >
-              <Ionicons name="wallet" size={24} color="rgba(255, 255, 255, 0.1)" />
+              <Ionicons name="wallet" size={24} color={theme.isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(74, 144, 226, 0.1)"} />
             </Animated.View>
             
             <Animated.View
@@ -148,7 +157,7 @@ export default function AppLoadingScreen({
                 },
               ]}
             >
-              <Ionicons name="bar-chart" size={20} color="rgba(255, 255, 255, 0.1)" />
+              <Ionicons name="bar-chart" size={20} color={theme.isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(74, 144, 226, 0.1)"} />
             </Animated.View>
             
             <Animated.View
@@ -158,7 +167,7 @@ export default function AppLoadingScreen({
                 { transform: [{ rotate: spin }] },
               ]}
             >
-              <Ionicons name="people" size={18} color="rgba(255, 255, 255, 0.1)" />
+              <Ionicons name="people" size={18} color={theme.isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(74, 144, 226, 0.1)"} />
             </Animated.View>
           </View>
         </Animated.View>
@@ -172,7 +181,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#4A90E2',
   },
   content: {
     alignItems: 'center',
@@ -191,11 +199,8 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    borderTopColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   innerDots: {
     position: 'absolute',
@@ -207,7 +212,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#FFFFFF',
   },
   dot1: {
     top: 10,
@@ -229,7 +233,6 @@ const styles = StyleSheet.create({
   },
   loadingMessage: {
     fontSize: 18,
-    color: '#FFFFFF',
     textAlign: 'center',
     fontWeight: '500',
     marginBottom: 20,
@@ -241,13 +244,11 @@ const styles = StyleSheet.create({
   progressBar: {
     width: 200,
     height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 2,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#FFFFFF',
     borderRadius: 2,
     transform: [{ scaleX: 0.7 }],
   },

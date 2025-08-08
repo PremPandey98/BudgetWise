@@ -7,6 +7,9 @@ import { APP_CONFIG } from '../../core/config/constants';
 import CustomPopup, { PopupType } from '../components/CustomPopup';
 import { expenseAPI, depositAPI } from '../../data/services/api';
 import AdaptiveStatusBar from '../components/AdaptiveStatusBar';
+import NetworkStatusBar from '../components/NetworkStatusBar';
+import { useTheme } from '../../core/theme/ThemeContext';
+import { offlineManager } from '../../services/OfflineManager';
 
 export default function AddExpenseScreen() {
   const [title, setTitle] = useState('');
@@ -19,11 +22,13 @@ export default function AddExpenseScreen() {
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [categories, setCategories] = useState<Array<{id: number, name: string}>>([]);
   const [categoriesError, setCategoriesError] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
   const [popup, setPopup] = useState<{visible: boolean, message: string, type: PopupType}>(
     { visible: false, message: '', type: 'info' }
   );
   
   const navigation = useNavigation();
+  const { theme } = useTheme();
 
   const showPopup = (message: string, type: PopupType = 'info') => setPopup({ visible: true, message, type });
   
@@ -35,6 +40,19 @@ export default function AddExpenseScreen() {
       navigation.goBack();
     }
   };
+
+  // Network status monitoring
+  useEffect(() => {
+    // Subscribe to network status changes
+    const unsubscribe = offlineManager.onNetworkStatusChange((online) => {
+      setIsOnline(online);
+    });
+
+    // Get initial network status
+    setIsOnline(offlineManager.getNetworkStatus());
+
+    return unsubscribe;
+  }, []);
 
   const validateForm = () => {
     if (!title.trim()) {
@@ -58,29 +76,8 @@ export default function AddExpenseScreen() {
 
     setLoading(true);
     try {
-      // Use TokenManager to get current context token (personal or group)
-      const { TokenManager } = await import('../../data/TokenManager');
-      const token = await TokenManager.getCurrentToken();
-
-      if (!token) {
-        showPopup('Authentication token missing. Please login again.', 'error');
-        return;
-      }
-
-      // Get user data and active group for local storage
-      const userData = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER_DATA);
-      const activeGroupData = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.ACTIVE_GROUP);
-      
-      if (!userData) {
-        showPopup('User session expired. Please login again.', 'error');
-        return;
-      }
-
-      const user = JSON.parse(userData);
-      const activeGroup = activeGroupData ? JSON.parse(activeGroupData) : null;
-
       if (type === 'expense') {
-        // Handle expense creation
+        // Handle expense creation using offline manager
         const selectedCategoryId = categoryId || (categories.find(cat => cat.name === category)?.id) || 1;
         
         console.log('🏷️ Selected category ID:', selectedCategoryId, 'for category:', category);
@@ -95,49 +92,18 @@ export default function AddExpenseScreen() {
           Tittle: title.trim(), // Note: API uses "Tittle" (with double t)
         };
 
-        console.log('💰 Creating expense via API:', expenseData);
-        const response = await expenseAPI.addExpenseRecord(expenseData, token);
-        console.log('✅ Expense created successfully:', response);
-
-        // Trigger notification for large expense
-        try {
-          const { NotificationService } = await import('../../services/NotificationService');
-          await NotificationService.checkAndNotifySpending(expenseAmount, category.trim() || 'Expense');
-        } catch (notifError) {
-          console.log('⚠️ Error with expense notification:', notifError);
+        console.log('💰 Creating expense via offline manager:', expenseData);
+        const result = await offlineManager.createExpense(expenseData);
+        
+        if (result.success) {
+          showPopup(`Expense "${title}" added successfully!`, 'success');
+        } else {
+          showPopup(result.error || 'Failed to save expense', 'error');
         }
 
-        // Save to local storage
-        const localExpenseData = {
-          id: response.id || Date.now().toString(),
-          title: title.trim(),
-          amount: -Math.abs(Number(amount)), // Negative for expenses
-          description: description.trim(),
-          category: category.trim(),
-          type: type,
-          userId: user.userId,
-          groupId: activeGroup ? activeGroup.id : null,
-          groupCode: activeGroup ? activeGroup.groupCode : null,
-          date: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          apiResponse: response,
-        };
-
-        const storageKey = activeGroup 
-          ? `${APP_CONFIG.STORAGE_KEYS.GROUP_EXPENSES_PREFIX}${activeGroup.id}`
-          : APP_CONFIG.STORAGE_KEYS.PERSONAL_EXPENSES;
-
-        const existingExpenses = await AsyncStorage.getItem(storageKey);
-        const expenses = existingExpenses ? JSON.parse(existingExpenses) : [];
-        expenses.unshift(localExpenseData);
-        await AsyncStorage.setItem(storageKey, JSON.stringify(expenses));
-
-        showPopup(`Expense "${title}" added successfully!`, 'success');
-
       } else {
-        // Handle deposit creation
+        // Handle deposit creation using offline manager
         console.log('💰 Adding deposit with amount:', amount);
-        
         const depositAmount = Math.abs(Number(amount));
         
         const depositData = {
@@ -146,36 +112,14 @@ export default function AddExpenseScreen() {
           tittle: title.trim(), // Note: API uses "tittle" (lowercase)
         };
 
-        console.log('💰 Creating deposit via API:', depositData);
-        const response = await depositAPI.addDeposit(depositData, token);
-        console.log('✅ Deposit created successfully:', response);
-
-        // Save to local storage (you might want to use a separate storage key for deposits)
-        const localDepositData = {
-          id: response.id || Date.now().toString(),
-          title: title.trim(),
-          amount: Math.abs(Number(amount)), // Positive for deposits
-          description: description.trim(),
-          category: 'Deposit', // Default category for deposits
-          type: type,
-          userId: user.userId,
-          groupId: activeGroup ? activeGroup.id : null,
-          groupCode: activeGroup ? activeGroup.groupCode : null,
-          date: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          apiResponse: response,
-        };
-
-        const storageKey = activeGroup 
-          ? `${APP_CONFIG.STORAGE_KEYS.GROUP_EXPENSES_PREFIX}${activeGroup.id}`
-          : APP_CONFIG.STORAGE_KEYS.PERSONAL_EXPENSES;
-
-        const existingExpenses = await AsyncStorage.getItem(storageKey);
-        const expenses = existingExpenses ? JSON.parse(existingExpenses) : [];
-        expenses.unshift(localDepositData);
-        await AsyncStorage.setItem(storageKey, JSON.stringify(expenses));
-
-        showPopup(`Deposit "${title}" added successfully!`, 'success');
+        console.log('💰 Creating deposit via offline manager:', depositData);
+        const result = await offlineManager.createDeposit(depositData);
+        
+        if (result.success) {
+          showPopup(`Deposit "${title}" added successfully!`, 'success');
+        } else {
+          showPopup(result.error || 'Failed to save deposit', 'error');
+        }
       }
 
     } catch (error: any) {
@@ -185,7 +129,7 @@ export default function AddExpenseScreen() {
       if (error.response) {
         errorMessage = `API Error: ${error.response.data?.message || error.response.statusText}`;
       } else if (error.request) {
-        errorMessage = 'Network error. Please check your connection and try again.';
+        errorMessage = 'Network error. Saved offline for later sync.';
       }
       
       showPopup(errorMessage, 'error');
@@ -199,61 +143,28 @@ export default function AddExpenseScreen() {
     setCategoriesLoading(true);
     setCategoriesError(false);
     try {
-      // Use TokenManager to get current context token (personal or group)
-      const { TokenManager } = await import('../../data/TokenManager');
-      const token = await TokenManager.getCurrentToken();
+      console.log('🔍 Loading categories via offline manager...');
+      const result = await offlineManager.getCategories();
       
-      if (token) {
-        console.log('🔍 Fetching expense categories from API...');
-        const categoriesData = await expenseAPI.getExpenseCategories(token);
-        console.log('✅ Categories loaded:', categoriesData);
-          
-        // Handle the API response structure with $values
-        let categoryList = [];
-        if (categoriesData && categoriesData.$values) {
-          // Map the API response to our expected format
-          categoryList = categoriesData.$values.map((cat: any) => ({
-            id: cat.expenseCategoryID,
-            name: cat.expenseCategoryName
-          }));
-        } else if (Array.isArray(categoriesData)) {
-          categoryList = categoriesData;
-        } else {
-          categoryList = categoriesData.data || [];
-        }
+      if (result.success && result.data) {
+        console.log('✅ Categories loaded:', result.data);
+        setCategories(result.data);
         
-        console.log('🔄 Processed categories:', categoryList);
-        setCategories(categoryList);
-        
-        if (categoryList.length > 0) {
-          console.log('✅ Categories set successfully, count:', categoryList.length);
+        if (result.data.length > 0) {
+          console.log('✅ Categories set successfully, count:', result.data.length);
         } else {
-          console.log('⚠️ No categories processed from API response');
+          console.log('⚠️ No categories received from offline manager');
         }
+      } else {
+        console.log('❌ Failed to load categories:', result.error);
+        setCategoriesError(true);
+        // Empty categories will trigger fallback UI
+        setCategories([]);
       }
     } catch (error) {
       console.log('❌ Error loading categories:', error);
       setCategoriesError(true);
-      // Fallback to hardcoded categories that match API structure
-      const fallbackCategories = [
-        { id: 1, name: 'Food' },
-        { id: 2, name: 'Hospital' },
-        { id: 3, name: 'Investment' },
-        { id: 4, name: 'Rent' },
-        { id: 5, name: 'Bill' },
-        { id: 6, name: 'Education' },
-        { id: 7, name: 'Transport' },
-        { id: 8, name: 'Entertainment' },
-        { id: 9, name: 'Utilities' },
-        { id: 10, name: 'Grocery' },
-        { id: 11, name: 'Travel' },
-        { id: 12, name: 'Insurance' },
-        { id: 13, name: 'Shopping' },
-        { id: 14, name: 'Loan' },
-        { id: 15, name: 'Miscellaneous' },
-        { id: 16, name: 'creditCardBill' },
-      ];
-      setCategories(fallbackCategories);
+      setCategories([]);
     } finally {
       setCategoriesLoading(false);
     }
@@ -268,10 +179,11 @@ export default function AddExpenseScreen() {
 
   return (
     <>
-      <AdaptiveStatusBar backgroundColor="#F0F8FF" />
+      <AdaptiveStatusBar backgroundColor={theme.colors.background} />
       <CustomPopup visible={popup.visible} message={popup.message} type={popup.type} onClose={closePopup} />
+      
       <KeyboardAvoidingView 
-        style={styles.container} 
+        style={[styles.container, { backgroundColor: theme.colors.background }]} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView 
@@ -281,20 +193,20 @@ export default function AddExpenseScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-              <Ionicons name="arrow-back" size={24} color="#2C5282" />
+          <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
+            <TouchableOpacity style={[styles.backButton, { backgroundColor: theme.colors.card }]} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={24} color={theme.colors.primary} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>
+            <Text style={[styles.headerTitle, { color: theme.colors.secondary }]}>
               {type === 'expense' ? 'Add Expense' : 'Add Deposit'}
             </Text>
             <View style={styles.placeholder} />
           </View>
 
           {/* Type Selector - Only Expense for now */}
-          <View style={styles.typeSelector}>
+          <View style={[styles.typeSelector, { backgroundColor: theme.colors.card }]}>
             <TouchableOpacity 
-              style={[styles.typeButton, type === 'expense' && styles.typeButtonActive]}
+              style={[styles.typeButton, type === 'expense' && [styles.typeButtonActive, { backgroundColor: theme.colors.primary }]]}
               onPress={() => setType('expense')}
             >
               <Ionicons 
@@ -302,12 +214,12 @@ export default function AddExpenseScreen() {
                 size={20} 
                 color={type === 'expense' ? '#fff' : '#FF4C5E'} 
               />
-              <Text style={[styles.typeButtonText, type === 'expense' && styles.typeButtonTextActive]}>
+              <Text style={[styles.typeButtonText, { color: theme.colors.primary }, type === 'expense' && styles.typeButtonTextActive]}>
                 Expense
               </Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.typeButton, type === 'credit' && styles.typeButtonActive]}
+              style={[styles.typeButton, type === 'credit' && [styles.typeButtonActive, { backgroundColor: theme.colors.primary }]]}
               onPress={() => setType('credit')}
             >
               <Ionicons 
@@ -315,15 +227,15 @@ export default function AddExpenseScreen() {
                 size={20} 
                 color={type === 'credit' ? '#fff' : '#00C897'} 
               />
-              <Text style={[styles.typeButtonText, type === 'credit' && styles.typeButtonTextActive]}>
+              <Text style={[styles.typeButtonText, { color: theme.colors.primary }, type === 'credit' && styles.typeButtonTextActive]}>
                 Deposit
               </Text>
             </TouchableOpacity>
           </View>
 
           {/* Form Container */}
-          <View style={styles.formContainer}>
-            <View style={styles.iconContainer}>
+          <View style={[styles.formContainer, { backgroundColor: theme.colors.card }]}>
+            <View style={[styles.iconContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.primary }]}>
               <Ionicons 
                 name={type === 'expense' ? "remove-circle" : "add-circle"} 
                 size={40} 
@@ -331,10 +243,10 @@ export default function AddExpenseScreen() {
               />
             </View>
             
-            <Text style={styles.title}>
+            <Text style={[styles.title, { color: theme.colors.secondary }]}>
               {type === 'expense' ? 'Record Expense' : 'Record Deposit'}
             </Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
               {type === 'expense' 
                 ? 'Track your spending and manage your budget'
                 : 'Track your income and deposits'
@@ -342,11 +254,11 @@ export default function AddExpenseScreen() {
             </Text>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Title *</Text>
+              <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Title *</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.text, borderColor: theme.colors.background }]}
                 placeholder={type === 'expense' ? "e.g. Lunch at restaurant" : "e.g. Salary payment"}
-                placeholderTextColor="#B0B0B0"
+                placeholderTextColor={theme.colors.textSecondary}
                 value={title}
                 onChangeText={setTitle}
                 autoCapitalize="words"
@@ -355,13 +267,13 @@ export default function AddExpenseScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Amount *</Text>
-              <View style={styles.amountContainer}>
-                <Text style={styles.currencySymbol}>₹</Text>
+              <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Amount *</Text>
+              <View style={[styles.amountContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.background }]}>
+                <Text style={[styles.currencySymbol, { color: theme.colors.textSecondary }]}>₹</Text>
                 <TextInput
-                  style={styles.amountInput}
+                  style={[styles.amountInput, { color: theme.colors.text }]}
                   placeholder="0.00"
-                  placeholderTextColor="#B0B0B0"
+                  placeholderTextColor={theme.colors.textSecondary}
                   value={amount}
                   onChangeText={setAmount}
                   keyboardType="decimal-pad"
@@ -372,20 +284,20 @@ export default function AddExpenseScreen() {
 
             {type === 'expense' && (
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>
+                <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>
                   Category * {categories.length > 0 && `(${categories.length} available)`}
                 </Text>
                 {categoriesLoading ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color="#4A90E2" />
-                    <Text style={styles.loadingText}>Loading categories...</Text>
+                  <View style={[styles.loadingContainer, { backgroundColor: theme.colors.surface }]}>
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                    <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading categories...</Text>
                   </View>
                 ) : categoriesError ? (
-                  <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>Failed to load categories</Text>
-                    <TouchableOpacity style={styles.retryButton} onPress={loadCategories}>
-                      <Ionicons name="refresh" size={16} color="#4A90E2" />
-                      <Text style={styles.retryText}>Retry</Text>
+                  <View style={[styles.errorContainer, { backgroundColor: theme.colors.surface }]}>
+                    <Text style={[styles.errorText, { color: theme.colors.error || '#FF4C5E' }]}>Failed to load categories</Text>
+                    <TouchableOpacity style={[styles.retryButton, { backgroundColor: theme.colors.background }]} onPress={loadCategories}>
+                      <Ionicons name="refresh" size={16} color={theme.colors.primary} />
+                      <Text style={[styles.retryText, { color: theme.colors.primary }]}>Retry</Text>
                     </TouchableOpacity>
                   </View>
                 ) : (
@@ -393,13 +305,21 @@ export default function AddExpenseScreen() {
                     {categories.map((cat) => (
                       <TouchableOpacity
                         key={cat.id}
-                        style={[styles.categoryChip, categoryId === cat.id && styles.categoryChipActive]}
+                        style={[
+                          styles.categoryChip, 
+                          { backgroundColor: theme.colors.surface, borderColor: theme.colors.background },
+                          categoryId === cat.id && [styles.categoryChipActive, { backgroundColor: theme.colors.primary }]
+                        ]}
                         onPress={() => {
                           setCategory(cat.name);
                           setCategoryId(cat.id);
                         }}
                       >
-                        <Text style={[styles.categoryChipText, categoryId === cat.id && styles.categoryChipTextActive]}>
+                        <Text style={[
+                          styles.categoryChipText, 
+                          { color: theme.colors.text },
+                          categoryId === cat.id && [styles.categoryChipTextActive, { color: '#fff' }]
+                        ]}>
                           {cat.name}
                         </Text>
                       </TouchableOpacity>
@@ -410,11 +330,11 @@ export default function AddExpenseScreen() {
             )}
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Description</Text>
+              <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Description</Text>
               <TextInput
-                style={[styles.input, styles.textArea]}
+                style={[styles.input, styles.textArea, { backgroundColor: theme.colors.surface, color: theme.colors.text, borderColor: theme.colors.background }]}
                 placeholder={type === 'expense' ? "Add notes or details (optional)" : "Add deposit details (optional)"}
-                placeholderTextColor="#B0B0B0"
+                placeholderTextColor={theme.colors.textSecondary}
                 value={description}
                 onChangeText={setDescription}
                 multiline={true}
@@ -427,7 +347,8 @@ export default function AddExpenseScreen() {
             <TouchableOpacity
               style={[
                 styles.saveButton, 
-                loading && styles.buttonDisabled,
+                { backgroundColor: theme.colors.primary },
+                loading && [styles.buttonDisabled, { backgroundColor: theme.colors.textSecondary }],
                 type === 'credit' && styles.creditButton
               ]} 
               onPress={handleSaveExpense}
@@ -545,13 +466,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#2C5282',
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#4A90E2',
     textAlign: 'center',
     marginBottom: 30,
     lineHeight: 22,
@@ -562,18 +481,14 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2C5282',
     marginBottom: 8,
   },
   input: {
     height: 50,
-    borderColor: '#E0E0E0',
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 16,
     fontSize: 16,
-    backgroundColor: '#FAFAFA',
-    color: '#2C5282',
   },
   textArea: {
     height: 80,
@@ -583,15 +498,12 @@ const styles = StyleSheet.create({
   amountContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderColor: '#E0E0E0',
     borderWidth: 1,
     borderRadius: 12,
-    backgroundColor: '#FAFAFA',
   },
   currencySymbol: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2C5282',
     paddingLeft: 16,
   },
   amountInput: {
@@ -613,7 +525,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginLeft: 10,
     fontSize: 16,
-    color: '#4A90E2',
   },
   errorContainer: {
     flexDirection: 'row',
@@ -621,14 +532,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 15,
     paddingHorizontal: 10,
-    backgroundColor: '#FFF5F5',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#FFB5B5',
   },
   errorText: {
     fontSize: 14,
-    color: '#FF4C5E',
     flex: 1,
   },
   retryButton: {
@@ -636,19 +545,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: '#F0F8FF',
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#4A90E2',
   },
   retryText: {
     marginLeft: 4,
     fontSize: 12,
-    color: '#4A90E2',
     fontWeight: '500',
   },
   categoryChip: {
-    backgroundColor: '#F0F8FF',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -662,7 +567,6 @@ const styles = StyleSheet.create({
   },
   categoryChipText: {
     fontSize: 14,
-    color: '#2C5282',
     fontWeight: '500',
   },
   categoryChipTextActive: {
@@ -670,13 +574,11 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     height: 55,
-    backgroundColor: '#FF4C5E',
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 12,
     marginTop: 20,
     flexDirection: 'row',
-    shadowColor: '#FF4C5E',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -687,7 +589,6 @@ const styles = StyleSheet.create({
     shadowColor: '#00C897',
   },
   buttonDisabled: {
-    backgroundColor: '#B0B0B0',
     shadowOpacity: 0.1,
   },
   saveButtonText: {

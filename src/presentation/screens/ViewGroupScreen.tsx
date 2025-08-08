@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_CONFIG } from '../../core/config/constants';
 import { userAPI, groupAPI } from '../../data/services/api';
 import { TokenManager } from '../../data/TokenManager';
+import { useTheme } from '../../core/theme/ThemeContext';
 
 type ViewGroupScreenRouteProp = RouteProp<{
   ViewGroup: {
@@ -25,6 +26,7 @@ export default function ViewGroupScreen() {
   const navigation = useNavigation();
   const route = useRoute<ViewGroupScreenRouteProp>();
   const { group } = route.params;
+  const { theme } = useTheme();
   
   const [loading, setLoading] = useState(false);
   const [groupDetails, setGroupDetails] = useState(group);

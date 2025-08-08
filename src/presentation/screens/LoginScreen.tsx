@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { userAPI } from '../../data/services/api';
@@ -9,6 +9,7 @@ import CustomToast, { ToastType } from '../components/CustomToast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_CONFIG } from '../../core/config/constants';
 import AdaptiveStatusBar from '../components/AdaptiveStatusBar';
+import { useTheme } from '../../core/theme/ThemeContext';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export default function LoginScreen({ navigation }: Props) {
+  const { theme } = useTheme();
   const [username, setUsername] = useState('');  // Changed from email to username
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);  
@@ -141,12 +143,13 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   return (
-    <>
+    <View style={[styles.fullContainer, { backgroundColor: theme.colors.background }]}>
+      <StatusBar backgroundColor={theme.colors.background} barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
       <AdaptiveStatusBar backgroundColor="#4A90E2" />
       <CustomToast visible={toast.visible} message={toast.message} type={toast.type} />
       <CustomPopup visible={popup.visible} message={popup.message} type={popup.type} onClose={closePopup} />
       <KeyboardAvoidingView 
-        style={styles.container} 
+        style={[styles.container, { backgroundColor: theme.colors.background }]} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
@@ -157,57 +160,62 @@ export default function LoginScreen({ navigation }: Props) {
           keyboardShouldPersistTaps="handled"
         >
       {/* Header Section with Gradient Effect */}
-      <View style={styles.headerSection}>
+      <View style={[styles.headerSection, { backgroundColor: theme.colors.primary }]}>
         <View style={styles.headerContent}>
-          <View style={styles.iconContainer}>
+          <View style={[styles.iconContainer, { backgroundColor: theme.isDark ? '#87CEEB' : '#87CEEB' }]}>
             <Text style={styles.iconText}>💰</Text>
           </View>
-          <Text style={styles.appName}>BudgetWise</Text>
-          <Text style={styles.tagline}>Smart Financial Management</Text>
+          <Text style={[styles.appName, { color: '#FFFFFF' }]}>BudgetWise</Text>
+          <Text style={[styles.tagline, { color: theme.isDark ? '#E6F3FF' : '#E6F3FF' }]}>Smart Financial Management</Text>
         </View>
       </View>
 
       {/* Main Content */}
       <View style={styles.contentSection}>
         <View style={styles.welcomeContainer}>
-          <Text style={styles.title}>Welcome Back!</Text>
-          <Text style={styles.subtitle}>Sign in to continue your financial journey</Text>
+          <Text style={[styles.title, { color: theme.colors.secondary }]}>Welcome Back!</Text>
+          <Text style={[styles.subtitle, { color: theme.colors.text }]}>Sign in to continue your financial journey</Text>
         </View>
 
         {/* Login Form */}
-        <View style={styles.formContainer}>
+        <View style={[styles.formContainer, { backgroundColor: theme.colors.card }]}>
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Username</Text>
+            <Text style={[styles.inputLabel, { color: theme.colors.secondary }]}>Username</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text, borderColor: theme.colors.border }]}
               placeholder="Enter your username"
-              placeholderTextColor="#6BB6FF"
+              placeholderTextColor={theme.colors.placeholder}
               value={username}
               onChangeText={setUsername}
               autoCapitalize="none"
               returnKeyType="next"
               blurOnSubmit={false}
+              selectionColor={theme.colors.primary}
+              underlineColorAndroid="transparent"
             />
           </View>
           
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Password</Text>
+            <Text style={[styles.inputLabel, { color: theme.colors.secondary }]}>Password</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text, borderColor: theme.colors.border }]}
               placeholder="Enter your password"
-              placeholderTextColor="#6BB6FF"
+              placeholderTextColor={theme.colors.placeholder}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
               returnKeyType="done"
               onSubmitEditing={handleLogin}
+              selectionColor={theme.colors.primary}
+              underlineColorAndroid="transparent"
             />
           </View>
           
           <TouchableOpacity 
-            style={[styles.loginButton, loading && styles.buttonDisabled]} 
+            style={[styles.loginButton, loading && styles.buttonDisabled, { backgroundColor: theme.colors.primary }]} 
             onPress={handleLogin}
             disabled={loading}
+            activeOpacity={0.8}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
@@ -218,28 +226,36 @@ export default function LoginScreen({ navigation }: Props) {
 
           {/* Action Links */}
           <View style={styles.linksContainer}>
-            <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-              <Text style={styles.link}>
-                Don't have an account? <Text style={styles.linkHighlight}>Register</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Register')} activeOpacity={0.7}>
+              <Text style={[styles.link, { color: theme.colors.textSecondary }]}>
+                Don't have an account? <Text style={[styles.linkHighlight, { color: theme.colors.primary }]}>Register</Text>
               </Text>
             </TouchableOpacity>
             
-            <TouchableOpacity onPress={() => navigation.navigate('Home')} style={styles.backLink}>
-              <Text style={styles.backLinkText}>← Back to Home</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')} activeOpacity={0.7}>
+              <Text style={[styles.link, { color: theme.colors.textSecondary }]}>
+                Forgot your password? <Text style={[styles.linkHighlight, { color: theme.colors.primary }]}>Reset it here</Text>
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity onPress={() => navigation.navigate('Home')} style={styles.backLink} activeOpacity={0.7}>
+              <Text style={[styles.backLinkText, { color: theme.colors.textSecondary }]}>← Back to Home</Text>
             </TouchableOpacity>
           </View>
         </View>
       </View>
       </ScrollView>
     </KeyboardAvoidingView>
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  fullContainer: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#F0F8FF',
   },
   scrollContainer: {
     flex: 1,
@@ -248,7 +264,6 @@ const styles = StyleSheet.create({
     paddingBottom: 50,
   },
   headerSection: {
-    backgroundColor: '#4A90E2',
     paddingTop: 60,
     paddingBottom: 40,
     borderBottomLeftRadius: 30,
@@ -260,7 +275,6 @@ const styles = StyleSheet.create({
   },  iconContainer: {
     width: 80,
     height: 80,
-    backgroundColor: '#87CEEB',
     borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
@@ -277,11 +291,9 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     marginBottom: 5,
   },  tagline: {
     fontSize: 16,
-    color: '#E6F3FF',
     fontWeight: '500',
   },
   contentSection: {
@@ -295,17 +307,14 @@ const styles = StyleSheet.create({
   },  title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#2C5282',
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: '#4A90E2',
     textAlign: 'center',
     lineHeight: 22,
   },formContainer: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 25,
     shadowColor: '#000',
@@ -321,17 +330,13 @@ const styles = StyleSheet.create({
   },  inputLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2C5282',
     marginBottom: 8,
   },  input: {
     height: 55,
-    borderColor: '#B3D9FF',
     borderWidth: 2,
     borderRadius: 12,
     paddingHorizontal: 18,
     fontSize: 16,
-    backgroundColor: '#F8FCFF',
-    color: '#2C5282',
     fontWeight: '500',
     shadowColor: '#B3D9FF',
     shadowOffset: { width: 0, height: 2 },
@@ -340,7 +345,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },  loginButton: {
     height: 55,
-    backgroundColor: '#4A90E2',
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 12,
@@ -365,20 +369,17 @@ const styles = StyleSheet.create({
     marginTop: 25,
   },  link: {
     fontSize: 15,
-    color: '#4A90E2',
     textAlign: 'center',
     marginBottom: 15,
   },
   linkHighlight: {
     fontWeight: 'bold',
-    color: '#87CEEB',
   },
   backLink: {
     marginTop: 10,
   },
   backLinkText: {
     fontSize: 14,
-    color: '#6BB6FF',
     textAlign: 'center',
   },
 });

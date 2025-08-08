@@ -12,6 +12,7 @@ import { userAPI, groupAPI } from '../../data/services/api';
 import { TokenManager } from '../../data/TokenManager';
 import ContextIndicator from '../components/ContextIndicator';
 import { AvatarColorStorage } from '../../utils/AvatarColorStorage';
+import { useTheme } from '../../core/theme/ThemeContext';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -29,6 +30,7 @@ export default function ProfileScreen() {
   const [joinLoading, setJoinLoading] = useState(false);
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const groupPasswordInputRef = useRef<TextInput>(null);
+  const { theme } = useTheme();
 
   useEffect(() => {
     fetchUser();
@@ -320,8 +322,8 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <Text style={styles.profileTitle}>Profile</Text>
+    <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]} contentContainerStyle={styles.scrollContent}>
+      <Text style={[styles.profileTitle, { color: theme.colors.secondary }]}>Profile</Text>
       
       {/* Context Indicator */}
       <ContextIndicator />
@@ -343,33 +345,33 @@ export default function ProfileScreen() {
           {...(avatarColor && { backgroundColor: avatarColor })}
         />
       </TouchableOpacity>
-      <Text style={styles.name}>{user.name}</Text>
-      <Text style={styles.email}>{user.email}</Text>
+      <Text style={[styles.name, { color: theme.colors.secondary }]}>{user.name}</Text>
+      <Text style={[styles.email, { color: theme.colors.textSecondary }]}>{user.email}</Text>
       <View style={styles.menuList}>
-        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('EditProfile' as never)}>
+        <TouchableOpacity style={[styles.menuItem, { backgroundColor: theme.colors.card }]} onPress={() => navigation.navigate('EditProfile' as never)}>
           <View style={[styles.menuIcon, { backgroundColor: '#6C63FF' }]}>  
             <Ionicons name="person-outline" size={22} color="#fff" />
           </View>
-          <Text style={styles.menuText}>Edit Profile</Text>
-          <Ionicons name="chevron-forward" size={22} color="#B0B0B0" style={styles.menuArrow} />
+          <Text style={[styles.menuText, { color: theme.colors.primary }]}>Edit Profile</Text>
+          <Ionicons name="chevron-forward" size={22} color={theme.colors.textSecondary} style={styles.menuArrow} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem} onPress={() => setGroupExpanded(!groupExpanded)}>
+        <TouchableOpacity style={[styles.menuItem, { backgroundColor: theme.colors.card }]} onPress={() => setGroupExpanded(!groupExpanded)}>
           <View style={[styles.menuIcon, { backgroundColor: '#FF9500' }]}>  
             <Ionicons name="people-outline" size={22} color="#fff" />
           </View>
-          <Text style={styles.menuText}>Group</Text>
+          <Text style={[styles.menuText, { color: theme.colors.primary }]}>Group</Text>
           <Ionicons 
             name={groupExpanded ? "chevron-down" : "chevron-forward"} 
             size={22} 
-            color="#B0B0B0" 
+            color={theme.colors.textSecondary} 
             style={styles.menuArrow} 
           />
         </TouchableOpacity>
         {groupExpanded && (
           <View style={styles.groupContent}>
-            <View style={styles.groupDemo}>
+            <View style={[styles.groupDemo, { backgroundColor: theme.colors.card }]}> 
               <View style={styles.groupHeader}>
-                <Text style={styles.groupTitle}>Active Group</Text>
+                <Text style={[styles.groupTitle, { color: theme.colors.primary }]}>Active Group</Text>
                 <TouchableOpacity 
                   style={styles.refreshButton} 
                   onPress={refreshGroupsFromAPI}
@@ -384,8 +386,8 @@ export default function ProfileScreen() {
               </View>
 
               {/* Current Active Group Display */}
-              <View style={styles.activeGroupContainer}>
-                <Text style={styles.activeGroupLabel}>Currently Active:</Text>
+              <View style={[styles.activeGroupContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.primary }]}> 
+                <Text style={[styles.activeGroupLabel, { color: theme.colors.primary }]}>Currently Active:</Text>
                 <TouchableOpacity 
                   style={[styles.groupItem, styles.activeGroupItem]}
                   onPress={() => activeGroup && navigation.getParent()?.navigate('ViewGroup', { group: activeGroup })}
@@ -405,10 +407,10 @@ export default function ProfileScreen() {
                     </View>
                   )}
                   <View style={styles.groupInfo}>
-                    <Text style={styles.groupName}>
+                    <Text style={[styles.groupName, { color: theme.colors.primary }]}> 
                       {activeGroup ? activeGroup.groupName : "Personal"}
                     </Text>
-                    <Text style={styles.groupMembers}>
+                    <Text style={[styles.groupMembers, { color: theme.colors.textSecondary }]}> 
                       {activeGroup 
                         ? `Code: ${activeGroup.groupCode}` 
                         : "Your individual expenses"
@@ -425,24 +427,24 @@ export default function ProfileScreen() {
               </View>
 
               {/* Group Selection */}
-              <Text style={styles.selectionTitle}>Switch to:</Text>
+              <Text style={[styles.selectionTitle, { color: theme.colors.secondary }]}>Switch to:</Text>
               
               {/* Personal Option */}
               {activeGroup && (
-                <View style={styles.groupItem}>
+                <View style={[styles.groupItem, { backgroundColor: theme.colors.background }]}> 
                   <View style={[styles.groupAvatar, styles.personalAvatar]}>
                     <Ionicons name="person" size={20} color="#4A90E2" />
                   </View>
                   <View style={styles.groupInfo}>
-                    <Text style={styles.groupName}>Personal</Text>
-                    <Text style={styles.groupMembers}>Your individual expenses</Text>
+                    <Text style={[styles.groupName, { color: theme.colors.primary }]}>Personal</Text>
+                    <Text style={[styles.groupMembers, { color: theme.colors.textSecondary }]}>Your individual expenses</Text>
                   </View>
-                  <TouchableOpacity 
-                    style={styles.selectButton}
-                    onPress={() => setActiveGroupAndSave(null)}
-                  >
-                    <Text style={styles.selectButtonText}>Select</Text>
-                  </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.selectButton, { backgroundColor: theme.colors.primary }]}
+                      onPress={() => setActiveGroupAndSave(null)}
+                    >
+                      <Text style={[styles.selectButtonText, { color: theme.colors.card }]}>Select</Text>
+                    </TouchableOpacity>
                 </View>
               )}
 
@@ -457,7 +459,7 @@ export default function ProfileScreen() {
                   .map((group: any, index: number) => (
                     <TouchableOpacity
                       key={group.id || index} 
-                      style={styles.groupItem}
+                      style={[styles.groupItem, { backgroundColor: theme.colors.background }]}
                       onPress={() => navigation.getParent()?.navigate('ViewGroup', { group })}
                       activeOpacity={0.7}
                     >
@@ -468,36 +470,36 @@ export default function ProfileScreen() {
                         backgroundColor="#FF9500"
                       />
                       <View style={styles.groupInfo}>
-                        <Text style={styles.groupName}>
+                        <Text style={[styles.groupName, { color: theme.colors.primary }]}> 
                           {group.groupName || `Group ${index + 1}`}
                         </Text>
-                        <Text style={styles.groupMembers}>
+                        <Text style={[styles.groupMembers, { color: theme.colors.textSecondary }]}> 
                           Code: {group.groupCode || 'N/A'}
                         </Text>
                         {group.description && (
-                          <Text style={styles.groupDescription}>
+                          <Text style={[styles.groupDescription, { color: theme.colors.textSecondary }]}> 
                             {group.description}
                           </Text>
                         )}
                       </View>
                       <View style={styles.groupButtonsContainer}>
                         <TouchableOpacity 
-                          style={styles.selectButton}
+                          style={[styles.selectButton, { backgroundColor: theme.colors.primary }]}
                           onPress={(e) => {
                             e.stopPropagation();
                             setActiveGroupAndSave(group);
                           }}
                         >
-                          <Text style={styles.selectButtonText}>Select</Text>
+                          <Text style={[styles.selectButtonText, { color: theme.colors.card }]}>Select</Text>
                         </TouchableOpacity>
                         <TouchableOpacity 
-                          style={styles.viewButton}
+                          style={[styles.viewButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.primary }]}
                           onPress={(e) => {
                             e.stopPropagation();
                             navigation.getParent()?.navigate('ViewGroup', { group });
                           }}
                         >
-                          <Text style={styles.viewButtonText}>View</Text>
+                          <Text style={[styles.viewButtonText, { color: theme.colors.primary }]}>View</Text>
                         </TouchableOpacity>
                       </View>
                     </TouchableOpacity>
@@ -524,26 +526,26 @@ export default function ProfileScreen() {
             </View>
           </View>
         )}
-        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Settings' as never)}>
+        <TouchableOpacity style={[styles.menuItem, { backgroundColor: theme.colors.card }]} onPress={() => navigation.navigate('Settings' as never)}>
           <View style={[styles.menuIcon, { backgroundColor: '#00C897' }]}>  
             <Ionicons name="settings-outline" size={22} color="#fff" />
           </View>
-          <Text style={styles.menuText}>Settings</Text>
-          <Ionicons name="chevron-forward" size={22} color="#B0B0B0" style={styles.menuArrow} />
+          <Text style={[styles.menuText, { color: theme.colors.primary }]}>Settings</Text>
+          <Ionicons name="chevron-forward" size={22} color={theme.colors.textSecondary} style={styles.menuArrow} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={[styles.menuItem, { backgroundColor: theme.colors.card }]} onPress={() => navigation.navigate('PrivacyPolicy' as never)}>
           <View style={[styles.menuIcon, { backgroundColor: '#444444' }]}>  
             <FontAwesome name="lock" size={20} color="#fff" />
           </View>
-          <Text style={styles.menuText}>Privacy Policy</Text>
-          <Ionicons name="chevron-forward" size={22} color="#B0B0B0" style={styles.menuArrow} />
+          <Text style={[styles.menuText, { color: theme.colors.primary }]}>Privacy Policy</Text>
+          <Ionicons name="chevron-forward" size={22} color={theme.colors.textSecondary} style={styles.menuArrow} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem} onPress={() => setLogoutPopup(true)}>
+        <TouchableOpacity style={[styles.menuItem, { backgroundColor: theme.colors.card }]} onPress={() => setLogoutPopup(true)}>
           <View style={[styles.menuIcon, { backgroundColor: '#FF4C5E' }]}>  
             <MaterialIcons name="power-settings-new" size={22} color="#fff" />
           </View>
           <Text style={[styles.menuText, { color: '#FF4C5E' }]}>Logout</Text>
-          <Ionicons name="chevron-forward" size={22} color="#B0B0B0" style={styles.menuArrow} />
+          <Ionicons name="chevron-forward" size={22} color={theme.colors.textSecondary} style={styles.menuArrow} />
         </TouchableOpacity>
       </View>
 
@@ -556,18 +558,18 @@ export default function ProfileScreen() {
         onRequestClose={closeJoinGroupModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.joinModalCard}>
+          <View style={[styles.joinModalCard, { backgroundColor: theme.colors.card }]}>
             <View style={styles.joinModalHeader}>
-              <Ionicons name="enter-outline" size={32} color="#4A90E2" style={{marginBottom: 8}} />
-              <Text style={styles.joinModalTitle}>Join Existing Group</Text>
-              <Text style={styles.joinModalSubtitle}>Enter the group code and password to join a group</Text>
+              <Ionicons name="enter-outline" size={32} color={theme.colors.primary} style={{marginBottom: 8}} />
+              <Text style={[styles.joinModalTitle, { color: theme.colors.secondary }]}>Join Existing Group</Text>
+              <Text style={[styles.joinModalSubtitle, { color: theme.colors.textSecondary }]}>Enter the group code and password to join a group</Text>
             </View>
             <View style={styles.modalInputContainer}>
-              <Text style={styles.modalInputLabel}>Group Code</Text>
+              <Text style={[styles.modalInputLabel, { color: theme.colors.textSecondary }]}>Group Code</Text>
               <TextInput
-                style={styles.modalInput}
+                style={[styles.modalInput, { backgroundColor: theme.colors.surface, color: theme.colors.text, borderColor: theme.colors.background }]}
                 placeholder="Enter group code"
-                placeholderTextColor="#B0B0B0"
+                placeholderTextColor={theme.colors.textSecondary}
                 value={groupCode}
                 onChangeText={setGroupCode}
                 autoCapitalize="none"
@@ -576,12 +578,12 @@ export default function ProfileScreen() {
               />
             </View>
             <View style={styles.modalInputContainer}>
-              <Text style={styles.modalInputLabel}>Password </Text>
+              <Text style={[styles.modalInputLabel, { color: theme.colors.textSecondary }]}>Password </Text>
               <TextInput
                 ref={groupPasswordInputRef}
-                style={styles.modalInput}
-                placeholder="Enter password if required"
-                placeholderTextColor="#B0B0B0"
+                style={[styles.modalInput, { backgroundColor: theme.colors.surface, color: theme.colors.text, borderColor: theme.colors.background }]}
+                placeholder="Enter password"
+                placeholderTextColor={theme.colors.textSecondary}
                 value={groupPassword}
                 onChangeText={setGroupPassword}
                 secureTextEntry
@@ -591,7 +593,7 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.joinModalButtons}>
               <TouchableOpacity
-                style={[styles.joinModalButton, { backgroundColor: '#4A90E2' }]}
+                style={[styles.joinModalButton, { backgroundColor: theme.colors.primary }]}
                 onPress={handleJoinGroup}
                 disabled={joinLoading}
               >
@@ -602,7 +604,7 @@ export default function ProfileScreen() {
                 )}
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.joinModalButton, { backgroundColor: '#B0B0B0' }]}
+                style={[styles.joinModalButton, { backgroundColor: theme.colors.textSecondary }]}
                 onPress={closeJoinGroupModal}
                 disabled={joinLoading}
               >
@@ -726,8 +728,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
+    paddingHorizontal: 16, // Add horizontal padding so items don't touch borders
     borderBottomWidth: 1,
     borderBottomColor: '#F0F8FF',
+    borderRadius: 16, // Make group list items more circular
+    marginBottom: 8,
   },
   groupAvatar: {
     width: 40,
@@ -901,13 +906,11 @@ const styles = StyleSheet.create({
   },
   modalInput: {
     height: 48,
-    borderColor: '#D1D5DB',
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
     marginBottom: 16,
     fontSize: 16,
-    color: '#2C5282',
   },
   modalButtons: {
     flexDirection: 'row',
@@ -958,7 +961,6 @@ const styles = StyleSheet.create({
   },
   joinModalCard: {
     width: '90%',
-    backgroundColor: '#fff',
     borderRadius: 20,
     padding: 28,
     shadowColor: '#000',
@@ -973,14 +975,12 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   joinModalTitle: {
-    color: '#2C5282',
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 4,
     textAlign: 'center',
   },
   joinModalSubtitle: {
-    color: '#4A90E2',
     fontSize: 14,
     marginBottom: 10,
     textAlign: 'center',
@@ -989,7 +989,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalInputLabel: {
-    color: '#2C5282',
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,

@@ -16,6 +16,8 @@ import { expenseAPI, depositAPI } from '../../data/services/api';
 import { TokenManager } from '../../data/TokenManager';
 import CustomPopup, { PopupType } from '../components/CustomPopup';
 import ContextIndicator from '../components/ContextIndicator';
+import { useTheme } from '../../core/theme/ThemeContext';
+import { offlineManager } from '../../services/OfflineManager';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -39,18 +41,34 @@ export default function ExpenseAnalyticsScreen() {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [deposits, setDeposits] = useState<any[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('month');
+  const [isOnline, setIsOnline] = useState(true);
   const [popup, setPopup] = useState<{visible: boolean, message: string, type: PopupType}>({
     visible: false, message: '', type: 'info'
   });
 
-  // Chart configuration
+  const { theme } = useTheme();
+
+  // Network status monitoring
+  useEffect(() => {
+    // Subscribe to network status changes
+    const unsubscribe = offlineManager.onNetworkStatusChange((online) => {
+      setIsOnline(online);
+    });
+
+    // Get initial network status
+    setIsOnline(offlineManager.getNetworkStatus());
+
+    return unsubscribe;
+  }, []);
+
+  // Chart configuration - dynamic based on theme
   const chartConfig = {
-    backgroundColor: '#ffffff',
-    backgroundGradientFrom: '#f8f9fa',
-    backgroundGradientTo: '#ffffff',
+    backgroundColor: theme.colors.card,
+    backgroundGradientFrom: theme.colors.card,
+    backgroundGradientTo: theme.colors.surface,
     decimalPlaces: 0,
     color: (opacity = 1) => `rgba(74, 144, 226, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(44, 82, 130, ${opacity})`,
+    labelColor: (opacity = 1) => theme.isDark ? `rgba(248, 250, 252, ${opacity})` : `rgba(44, 82, 130, ${opacity})`,
     style: {
       borderRadius: 16,
     },
@@ -67,66 +85,35 @@ export default function ExpenseAnalyticsScreen() {
     if (showLoading) setLoading(true);
     
     try {
-      // Use TokenManager to get current context token (personal or group)
-      const token = await TokenManager.getCurrentToken();
-      if (!token) {
-        console.log('❌ No token available - user may need to login again');
-        showPopup('Please login to view analytics', 'error');
-        return;
-      }
+      console.log('📊 Fetching analytics data via offline manager...');
+      const result = await offlineManager.getAnalyticsData();
+      
+      if (result.success) {
+        const expensesList = result.expenses || [];
+        const depositsList = result.deposits || [];
+        
+        setExpenses(expensesList);
+        setDeposits(depositsList);
 
-      console.log('🔍 Fetching context-aware analytics data...');
-      console.log('🔑 Using token (first 20 chars):', token.substring(0, 20) + '...');
+        console.log('✅ Analytics data loaded successfully');
+        console.log(`📊 Loaded ${expensesList.length} expenses and ${depositsList.length} deposits`);
 
-      // Fetch expenses and deposits using context-aware token
-      const [expensesResponse, depositsResponse] = await Promise.all([
-        expenseAPI.getAllRelatedExpenseRecords(token),
-        depositAPI.getAllRelatedDeposits(token)
-      ]);
-
-      console.log('✅ Context-aware analytics data loaded');
-
-      // Handle expenses data
-      let expensesList = [];
-      if (expensesResponse && expensesResponse.$values) {
-        expensesList = expensesResponse.$values;
-      } else if (Array.isArray(expensesResponse)) {
-        expensesList = expensesResponse;
-      }
-
-      // Handle deposits data
-      let depositsList = [];
-      if (depositsResponse && depositsResponse.$values) {
-        depositsList = depositsResponse.$values;
-      } else if (Array.isArray(depositsResponse)) {
-        depositsList = depositsResponse;
-      }
-
-      setExpenses(expensesList);
-      setDeposits(depositsList);
-
-      // Debug logging to check the data structure
-      if (expensesList.length > 0) {
-        console.log('📊 First expense item structure:', Object.keys(expensesList[0]));
-        console.log('📊 First expense item data:', expensesList[0]);
-      }
-      if (depositsList.length > 0) {
-        console.log('📊 First deposit item structure:', Object.keys(depositsList[0]));
-        console.log('📊 First deposit item data:', depositsList[0]);
+        // Debug logging to check the data structure
+        if (expensesList.length > 0) {
+          console.log('📊 First expense item structure:', Object.keys(expensesList[0]));
+          console.log('📊 First expense item data:', expensesList[0]);
+        }
+        if (depositsList.length > 0) {
+          console.log('📊 First deposit item structure:', Object.keys(depositsList[0]));
+          console.log('📊 First deposit item data:', depositsList[0]);
+        }
+      } else {
+        console.error('❌ Error loading analytics data:', result.error);
+        showPopup(result.error || 'Failed to load analytics data', 'error');
       }
 
     } catch (error: any) {
       console.error('❌ Error fetching analytics data:', error);
-      
-      // Check if it's a 401 error specifically
-      if (error.response?.status === 401) {
-        console.log('🔒 Authentication failed - token may be expired');
-        console.log('💡 Running token diagnostics...');
-        
-        // Debug token information
-        await TokenManager.debugTokens();
-      }
-      
       showPopup('Failed to load analytics data', 'error');
     } finally {
       setLoading(false);
@@ -410,23 +397,23 @@ export default function ExpenseAnalyticsScreen() {
   const CombinedBarChart = ({ labels, expensesData, depositsData, label }: { labels: string[]; expensesData: number[]; depositsData: number[]; label: string }) => {
     const maxValue = Math.max(...expensesData, ...depositsData, 1);
     return (
-      <View style={styles.enhancedChartContainer}>
-        <Text style={styles.enhancedChartTitle}>{label}</Text>
+      <View style={[styles.enhancedChartContainer, { backgroundColor: theme.colors.card }]}>
+        <Text style={[styles.enhancedChartTitle, { color: theme.colors.secondary }]}>{label}</Text>
         
         {/* Legend */}
         <View style={styles.legendRow}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#FF6B6B' }]} />
-            <Text style={styles.legendLabel}>Expenses</Text>
+            <Text style={[styles.legendLabel, { color: theme.colors.primary }]}>Expenses</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#34C759' }]} />
-            <Text style={styles.legendLabel}>Deposits</Text>
+            <Text style={[styles.legendLabel, { color: theme.colors.primary }]}>Deposits</Text>
           </View>
         </View>
 
         {/* Chart Area */}
-        <View style={styles.chartArea}>
+        <View style={[styles.chartArea, { backgroundColor: theme.isDark ? 'rgba(55, 65, 81, 0.3)' : 'rgba(240, 248, 255, 0.3)' }]}>
           {labels.map((monthLabel, idx) => (
             <View key={monthLabel + idx} style={styles.barGroup}>
               {/* Bars Container */}
@@ -457,7 +444,7 @@ export default function ExpenseAnalyticsScreen() {
               </View>
               
               {/* Month Label */}
-              <Text style={styles.monthLabel}>{monthLabel}</Text>
+              <Text style={[styles.monthLabel, { color: theme.colors.primary }]}>{monthLabel}</Text>
               
               {/* Values */}
               <View style={styles.valuesContainer}>
@@ -507,9 +494,9 @@ export default function ExpenseAnalyticsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4A90E2" />
-        <Text style={styles.loadingText}>Loading analytics...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}> 
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={[styles.loadingText, { color: theme.colors.primary }]}>Loading analytics...</Text>
       </View>
     );
   }
@@ -517,16 +504,16 @@ export default function ExpenseAnalyticsScreen() {
   return (
     <>
       <ScrollView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#4A90E2']} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} tintColor={theme.colors.primary} />
         }
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Financial Analytics</Text>
-          <Text style={styles.headerSubtitle}>Track your spending patterns</Text>
+          <Text style={[styles.headerTitle, { color: theme.colors.secondary }]}>Financial Analytics</Text>
+          <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>Track your spending patterns</Text>
         </View>
 
         {/* Context Indicator */}
@@ -534,30 +521,30 @@ export default function ExpenseAnalyticsScreen() {
 
         {/* Summary Cards */}
         <View style={styles.summaryContainer}>
-          <View style={styles.summaryCard}>
+          <View style={[styles.summaryCard, { backgroundColor: theme.colors.card }]}>
             <Ionicons name="trending-down" size={24} color="#FF6B6B" />
-            <Text style={styles.summaryValue}>₹{totalExpenses.toFixed(2)}</Text>
-            <Text style={styles.summaryLabel}>Total Expenses</Text>
+            <Text style={[styles.summaryValue, { color: theme.colors.secondary }]}>₹{totalExpenses.toFixed(2)}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>Total Expenses</Text>
           </View>
-          <View style={styles.summaryCard}>
+          <View style={[styles.summaryCard, { backgroundColor: theme.colors.card }]}>
             <Ionicons name="trending-up" size={24} color="#00C897" />
-            <Text style={styles.summaryValue}>₹{totalDeposits.toFixed(2)}</Text>
-            <Text style={styles.summaryLabel}>Total Deposits</Text>
+            <Text style={[styles.summaryValue, { color: theme.colors.secondary }]}>₹{totalDeposits.toFixed(2)}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>Total Deposits</Text>
           </View>
         </View>
 
         <View style={styles.summaryContainer}>
-          <View style={styles.summaryCard}>
+          <View style={[styles.summaryCard, { backgroundColor: theme.colors.card }]}>
             <Ionicons name="wallet" size={24} color={netBalance >= 0 ? "#00C897" : "#FF6B6B"} />
             <Text style={[styles.summaryValue, { color: netBalance >= 0 ? "#00C897" : "#FF6B6B" }]}>
               ₹{netBalance.toFixed(2)}
             </Text>
-            <Text style={styles.summaryLabel}>Net Balance</Text>
+            <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>Net Balance</Text>
           </View>
-          <View style={styles.summaryCard}>
+          <View style={[styles.summaryCard, { backgroundColor: theme.colors.card }]}>
             <Ionicons name="calculator" size={24} color="#4A90E2" />
-            <Text style={styles.summaryValue}>₹{avgExpense.toFixed(2)}</Text>
-            <Text style={styles.summaryLabel}>Avg Expense</Text>
+            <Text style={[styles.summaryValue, { color: theme.colors.secondary }]}>₹{avgExpense.toFixed(2)}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>Avg Expense</Text>
           </View>
         </View>
 
@@ -573,8 +560,8 @@ export default function ExpenseAnalyticsScreen() {
 
         {/* Category Breakdown Pie Chart */}
         {categoryData && Array.isArray(categoryData) && categoryData.length > 0 && (
-          <View style={styles.chartContainer}>
-            <Text style={styles.chartTitle}>Expense Categories</Text>
+          <View style={[styles.chartContainer, { backgroundColor: theme.colors.card }]}>
+            <Text style={[styles.chartTitle, { color: theme.colors.secondary }]}>Expense Categories</Text>
             <PieChart
               data={categoryData}
               width={screenWidth - 40}
@@ -593,8 +580,8 @@ export default function ExpenseAnalyticsScreen() {
 
         {/* Top Categories List */}
         {categoryData && Array.isArray(categoryData) && categoryData.length > 0 && (
-          <View style={styles.categoriesContainer}>
-            <Text style={styles.chartTitle}>Top Spending Categories</Text>
+          <View style={[styles.categoriesContainer, { backgroundColor: theme.colors.card }]}>
+            <Text style={[styles.chartTitle, { color: theme.colors.secondary }]}>Top Spending Categories</Text>
             {categoryData.slice(0, 5).map((item, index) => {
               if (!item || !item.name) return null;
               
@@ -602,15 +589,24 @@ export default function ExpenseAnalyticsScreen() {
               const nameParts = item.name.split(' ');
               const categoryName = nameParts.slice(0, -1).join(' '); // All parts except last (percentage)
               const percentage = nameParts[nameParts.length - 1]; // Last part (percentage)
+              const isLastItem = index === categoryData.slice(0, 5).length - 1;
+              
               return (
-                <View key={item.name + index} style={styles.categoryItem}>
+                <View key={item.name + index} style={[
+                  styles.categoryItem, 
+                  { 
+                    backgroundColor: theme.colors.background,
+                    marginBottom: isLastItem ? 0 : 12,
+                    borderColor: theme.isDark ? 'rgba(74, 144, 226, 0.15)' : 'rgba(74, 144, 226, 0.1)'
+                  }
+                ]}>
                   <View style={styles.categoryLeft}>
                     <View style={[styles.categoryColor, { backgroundColor: item.color || '#FF6B6B' }]} />
-                    <Text style={styles.categoryName}>{categoryName || 'Unknown'}</Text>
+                    <Text style={[styles.categoryName, { color: theme.colors.primary }]}>{categoryName || 'Unknown'}</Text>
                   </View>
                   <View style={styles.categoryRight}>
-                    <Text style={styles.categoryPercentage}>{percentage || '0%'}</Text>
-                    <Text style={styles.categoryAmount}>₹{(item.amount || 0).toFixed(2)}</Text>
+                    <Text style={[styles.categoryPercentage, { color: theme.colors.secondary }]}>{percentage || '0%'}</Text>
+                    <Text style={[styles.categoryAmount, { color: theme.colors.secondary }]}>₹{(item.amount || 0).toFixed(2)}</Text>
                   </View>
                 </View>
               );
@@ -620,10 +616,10 @@ export default function ExpenseAnalyticsScreen() {
 
         {/* Empty State */}
         {(!expenses || expenses.length === 0) && (!deposits || deposits.length === 0) && (
-          <View style={styles.emptyState}>
-            <Ionicons name="analytics-outline" size={64} color="#B0B0B0" />
-            <Text style={styles.emptyStateText}>No data to analyze yet</Text>
-            <Text style={styles.emptyStateSubtext}>Add some expenses and deposits to see beautiful charts</Text>
+          <View style={[styles.emptyState, { backgroundColor: theme.colors.card }]}>
+            <Ionicons name="analytics-outline" size={64} color={theme.colors.secondary} />
+            <Text style={[styles.emptyStateText, { color: theme.colors.primary }]}>No data to analyze yet</Text>
+            <Text style={[styles.emptyStateSubtext, { color: theme.colors.secondary }]}>Add some expenses and deposits to see beautiful charts</Text>
           </View>
         )}
 
@@ -643,34 +639,28 @@ export default function ExpenseAnalyticsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F8FF',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F0F8FF',
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#4A90E2',
   },
   header: {
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 20,
-    backgroundColor: '#4A90E2',
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#E6F3FF',
   },
   summaryContainer: {
     flexDirection: 'row',
@@ -680,7 +670,6 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 20,
     alignItems: 'center',
@@ -695,19 +684,16 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#2C5282',
     marginTop: 12,
     marginBottom: 4,
   },
   summaryLabel: {
     fontSize: 13,
-    color: '#4A90E2',
     fontWeight: '600',
     textAlign: 'center',
     letterSpacing: 0.5,
   },
   chartContainer: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     marginHorizontal: 20,
     marginTop: 24,
@@ -723,7 +709,6 @@ const styles = StyleSheet.create({
   chartTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#2C5282',
     marginBottom: 16,
     textAlign: 'center',
     letterSpacing: 0.3,
@@ -759,28 +744,34 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 12,
-    color: '#4A90E2',
     fontWeight: '600',
   },
   categoriesContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 20,
     marginHorizontal: 20,
     marginTop: 20,
-    padding: 16,
+    padding: 20,
     shadowColor: '#4A90E2',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(74, 144, 226, 0.08)',
   },
   categoryItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F8FF',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    shadowColor: '#4A90E2',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   categoryLeft: {
     flexDirection: 'row',
@@ -804,19 +795,16 @@ const styles = StyleSheet.create({
   },
   categoryName: {
     fontSize: 14,
-    color: '#2C5282',
     fontWeight: '500',
     flex: 1,
   },
   categoryPercentage: {
     fontSize: 12,
-    color: '#4A90E2',
     fontWeight: '600',
     marginBottom: 2,
   },
   categoryAmount: {
     fontSize: 14,
-    color: '#2C5282',
     fontWeight: '700',
   },
   emptyState: {
@@ -827,21 +815,18 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 20,
-    color: '#2C5282',
     fontWeight: '600',
     marginTop: 16,
     textAlign: 'center',
   },
   emptyStateSubtext: {
     fontSize: 14,
-    color: '#4A90E2',
     marginTop: 8,
     textAlign: 'center',
     lineHeight: 20,
   },
   // Enhanced Chart Styles
   enhancedChartContainer: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     marginHorizontal: 20,
     marginTop: 24,
@@ -855,7 +840,6 @@ const styles = StyleSheet.create({
   enhancedChartTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#2C5282',
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -877,7 +861,6 @@ const styles = StyleSheet.create({
   },
   legendLabel: {
     fontSize: 14,
-    color: '#2C5282',
     fontWeight: '600',
     marginLeft: 8,
   },
@@ -886,7 +869,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'flex-end',
     height: 200,
-    backgroundColor: 'rgba(240, 248, 255, 0.3)',
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 16,
@@ -918,7 +900,6 @@ const styles = StyleSheet.create({
   },
   monthLabel: {
     fontSize: 13,
-    color: '#2C5282',
     fontWeight: '600',
     marginBottom: 4,
     textAlign: 'center',

@@ -7,6 +7,7 @@ import { APP_CONFIG } from '../../core/config/constants';
 import { groupAPI, userAPI } from '../../data/services/api';
 import { TokenManager } from '../../data/TokenManager';
 import CustomPopup, { PopupType } from '../components/CustomPopup';
+import { useTheme } from '../../core/theme/ThemeContext';
 
 export default function CreateGroupScreen() {
   const [groupName, setGroupName] = useState('');
@@ -19,6 +20,7 @@ export default function CreateGroupScreen() {
   );
   
   const navigation = useNavigation();
+  const { theme } = useTheme();
 
   const showPopup = (message: string, type: PopupType = 'info') => setPopup({ visible: true, message, type });
   
@@ -137,7 +139,7 @@ export default function CreateGroupScreen() {
     <>
       <CustomPopup visible={popup.visible} message={popup.message} type={popup.type} onClose={closePopup} />
       <KeyboardAvoidingView 
-        style={styles.container} 
+        style={[styles.container, { backgroundColor: theme.colors.background }]} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView 
@@ -147,29 +149,29 @@ export default function CreateGroupScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-              <Ionicons name="arrow-back" size={24} color="#2C5282" />
+          <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
+            <TouchableOpacity style={[styles.backButton, { backgroundColor: theme.colors.card }]} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={24} color={theme.colors.primary} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Create Group</Text>
+            <Text style={[styles.headerTitle, { color: theme.colors.secondary }]}>Create Group</Text>
             <View style={styles.placeholder} />
           </View>
 
           {/* Form Container */}
-          <View style={styles.formContainer}>
-            <View style={styles.iconContainer}>
+          <View style={[styles.formContainer, { backgroundColor: theme.colors.card }]}>
+            <View style={[styles.iconContainer, { backgroundColor: theme.colors.surface, borderColor: '#FF9500' }]}>
               <Ionicons name="people" size={40} color="#FF9500" />
             </View>
             
-            <Text style={styles.title}>Create New Group</Text>
-            <Text style={styles.subtitle}>Set up a group to manage shared expenses</Text>
+            <Text style={[styles.title, { color: theme.colors.secondary }]}>Create New Group</Text>
+            <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Set up a group to manage shared expenses</Text>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Group Name</Text>
+              <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Group Name</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.text, borderColor: theme.colors.background }]}
                 placeholder="Enter group name"
-                placeholderTextColor="#B0B0B0"
+                placeholderTextColor={theme.colors.textSecondary}
                 value={groupName}
                 onChangeText={setGroupName}
                 autoCapitalize="words"
@@ -178,11 +180,11 @@ export default function CreateGroupScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Group Code</Text>
+              <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Group Code</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.text, borderColor: theme.colors.background }]}
                 placeholder="Enter unique group code"
-                placeholderTextColor="#B0B0B0"
+                placeholderTextColor={theme.colors.textSecondary}
                 value={groupCode}
                 onChangeText={setGroupCode}
                 autoCapitalize="none"
@@ -191,11 +193,11 @@ export default function CreateGroupScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Description</Text>
+              <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Description</Text>
               <TextInput
-                style={[styles.input, styles.textArea]}
+                style={[styles.input, styles.textArea, { backgroundColor: theme.colors.surface, color: theme.colors.text, borderColor: theme.colors.background }]}
                 placeholder="Describe the purpose of this group"
-                placeholderTextColor="#B0B0B0"
+                placeholderTextColor={theme.colors.textSecondary}
                 value={description}
                 onChangeText={setDescription}
                 multiline={true}
@@ -205,11 +207,11 @@ export default function CreateGroupScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Password</Text>
+              <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>Password</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.text, borderColor: theme.colors.background }]}
                 placeholder="Set a password for the group"
-                placeholderTextColor="#B0B0B0"
+                placeholderTextColor={theme.colors.textSecondary}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
@@ -219,7 +221,11 @@ export default function CreateGroupScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.createButton, loading && styles.buttonDisabled]} 
+              style={[
+                styles.createButton, 
+                { backgroundColor: '#FF9500' },
+                loading && [styles.buttonDisabled, { backgroundColor: '#FFB366' }]
+              ]} 
               onPress={handleCreateGroup}
               disabled={loading}
             >
@@ -242,7 +248,6 @@ export default function CreateGroupScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F8FF',
   },
   scrollContainer: {
     flex: 1,
@@ -258,24 +263,20 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    backgroundColor: '#F0F8FF',
   },
   backButton: {
     padding: 8,
     borderRadius: 8,
-    backgroundColor: '#FFFFFF',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#2C5282',
   },
   placeholder: {
     width: 40,
   },
   formContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 25,
@@ -290,24 +291,20 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#FFF5E6',
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
     marginBottom: 20,
     borderWidth: 2,
-    borderColor: '#FF9500',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#2C5282',
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#4A90E2',
     textAlign: 'center',
     marginBottom: 30,
     lineHeight: 22,
@@ -318,18 +315,14 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2C5282',
     marginBottom: 8,
   },
   input: {
     height: 50,
-    borderColor: '#E0E0E0',
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 16,
     fontSize: 16,
-    backgroundColor: '#FAFAFA',
-    color: '#2C5282',
   },
   textArea: {
     height: 80,
@@ -338,7 +331,6 @@ const styles = StyleSheet.create({
   },
   createButton: {
     height: 55,
-    backgroundColor: '#FF9500',
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 12,
@@ -351,7 +343,6 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   buttonDisabled: {
-    backgroundColor: '#FFB366',
     shadowOpacity: 0.1,
   },
   createButtonText: {

@@ -9,27 +9,41 @@ import {
   Alert,
   Linking,
 } from 'react-native';
-import { Ionicons, MaterialIcons, FontAwesome } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_CONFIG } from '../../core/config/constants';
 import CustomPopup, { PopupType } from '../components/CustomPopup';
+import ContactMethodsPopup from '../components/ContactMethodsPopup';
+import { useTheme } from '../../core/theme/ThemeContext';
+import { SettingItem } from '../components/SettingItem';
+import ExportModal from '../components/ExportModal';
 
 type SettingsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function SettingsScreen() {
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
-  const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
-  const [darkModeEnabled, setDarkModeEnabled] = useState(false);
-  const [currencyPreference, setCurrencyPreference] = useState('USD');
+  const [exportModalVisible, setExportModalVisible] = useState(false);
   const [popup, setPopup] = useState<{visible: boolean, message: string, type: PopupType}>(
+    { visible: false, message: '', type: 'info' }
+  );
+  const [supportPopup, setSupportPopup] = useState<{visible: boolean, message: string, type: PopupType, title?: string}>(
+    { visible: false, message: '', type: 'confirm' }
+  );
+  const [ratePopup, setRatePopup] = useState<{visible: boolean, message: string, type: PopupType, title?: string}>(
+    { visible: false, message: '', type: 'confirm' }
+  );
+  const [aboutPopup, setAboutPopup] = useState<{visible: boolean, message: string, type: PopupType, title?: string}>(
+    { visible: false, message: '', type: 'info' }
+  );
+  const [contactMethodPopup, setContactMethodPopup] = useState<{visible: boolean, message: string, type: PopupType, title?: string}>(
     { visible: false, message: '', type: 'info' }
   );
   
   const navigation = useNavigation<SettingsScreenNavigationProp>();
+  const { theme, isDarkMode, toggleTheme } = useTheme();
 
   // Load settings from storage
   useEffect(() => {
@@ -41,11 +55,7 @@ export default function SettingsScreen() {
       const settings = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.APP_SETTINGS);
       if (settings) {
         const parsed = JSON.parse(settings);
-        setNotificationsEnabled(parsed.notifications ?? true);
         setBiometricEnabled(parsed.biometric ?? false);
-        setAutoBackupEnabled(parsed.autoBackup ?? false);
-        setDarkModeEnabled(parsed.darkMode ?? false);
-        setCurrencyPreference(parsed.currency ?? 'USD');
       }
     } catch (error) {
       console.log('Error loading settings:', error);
@@ -55,11 +65,7 @@ export default function SettingsScreen() {
   const saveSettings = async (newSettings: any) => {
     try {
       const currentSettings = {
-        notifications: notificationsEnabled,
         biometric: biometricEnabled,
-        autoBackup: autoBackupEnabled,
-        darkMode: darkModeEnabled,
-        currency: currencyPreference,
         ...newSettings,
       };
       
@@ -78,15 +84,6 @@ export default function SettingsScreen() {
     setPopup(p => ({ ...p, visible: false }));
   };
 
-  const handleNotificationToggle = async (value: boolean) => {
-    setNotificationsEnabled(value);
-    await saveSettings({ notifications: value });
-    showPopup(
-      value ? 'Notifications enabled' : 'Notifications disabled',
-      'success'
-    );
-  };
-
   const handleBiometricToggle = async (value: boolean) => {
     setBiometricEnabled(value);
     await saveSettings({ biometric: value });
@@ -96,71 +93,24 @@ export default function SettingsScreen() {
     );
   };
 
-  const handleAutoBackupToggle = async (value: boolean) => {
-    setAutoBackupEnabled(value);
-    await saveSettings({ autoBackup: value });
+  const handleDarkModeToggle = async (value: boolean) => {
+    toggleTheme();
     showPopup(
-      value ? 'Auto backup enabled' : 'Auto backup disabled',
+      value ? 'Dark mode enabled' : 'Light mode enabled',
       'success'
     );
   };
 
-  const handleDarkModeToggle = async (value: boolean) => {
-    setDarkModeEnabled(value);
-    await saveSettings({ darkMode: value });
-    showPopup(
-      value ? 'Dark mode enabled (coming soon)' : 'Light mode enabled',
-      'info'
-    );
-  };
-
-  const handleClearData = () => {
-    Alert.alert(
-      'Clear All Data',
-      'This will permanently delete all your expenses, groups, and settings. This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear Data',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Clear all app data except user authentication
-              await AsyncStorage.multiRemove([
-                APP_CONFIG.STORAGE_KEYS.USER_GROUPS,
-                APP_CONFIG.STORAGE_KEYS.ACTIVE_GROUP,
-                APP_CONFIG.STORAGE_KEYS.PERSONAL_EXPENSES,
-                APP_CONFIG.STORAGE_KEYS.APP_SETTINGS,
-              ]);
-              
-              // Clear all group-specific expenses
-              const allKeys = await AsyncStorage.getAllKeys();
-              const groupExpenseKeys = allKeys.filter(key => 
-                key.startsWith(APP_CONFIG.STORAGE_KEYS.GROUP_EXPENSES_PREFIX)
-              );
-              if (groupExpenseKeys.length > 0) {
-                await AsyncStorage.multiRemove(groupExpenseKeys);
-              }
-              
-              showPopup('All data cleared successfully', 'success');
-              
-              // Reset settings to default
-              setNotificationsEnabled(true);
-              setBiometricEnabled(false);
-              setAutoBackupEnabled(false);
-              setDarkModeEnabled(false);
-              setCurrencyPreference('USD');
-            } catch (error) {
-              showPopup('Error clearing data', 'error');
-            }
-          }
-        }
-      ]
-    );
-  };
-
   const handleExportData = () => {
-    showPopup('Export data feature coming soon!', 'info');
+    setExportModalVisible(true);
+  };
+
+  const handleExportSuccess = (message: string) => {
+    showPopup(message, 'success');
+  };
+
+  const handleExportError = (message: string) => {
+    showPopup(message, 'error');
   };
 
   const handleImportData = () => {
@@ -168,230 +118,166 @@ export default function SettingsScreen() {
   };
 
   const handleContactSupport = () => {
-    Alert.alert(
-      'Contact Support',
-      'How would you like to contact support?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Email',
-          onPress: () => Linking.openURL('mailto:support@budgetwise.com?subject=BudgetWise Support')
-        },
-        {
-          text: 'WhatsApp',
-          onPress: () => Linking.openURL('https://wa.me/1234567890')
-        }
-      ]
-    );
+    setSupportPopup({
+      visible: true,
+      message: 'Get professional help and support for BudgetWise. Our team is ready to assist you!',
+      type: 'confirm',
+      title: 'Contact Support'
+    });
+  };
+
+  const handleShowContactMethods = () => {
+    setSupportPopup({ visible: false, message: '', type: 'confirm' });
+    // Show contact methods popup with icons
+    setContactMethodPopup({
+      visible: true,
+      message: 'Choose how you would like to contact our support team:',
+      type: 'info',
+      title: 'Contact Support'
+    });
+  };
+
+  const handleCloseContactMethods = () => {
+    setContactMethodPopup({ visible: false, message: '', type: 'info' });
+  };
+
+  const handleSupportEmail = () => {
+    setContactMethodPopup({ visible: false, message: '', type: 'info' });
+    Linking.openURL('mailto:budgetwise10@gmail.com?subject=BudgetWise Support Request&body=Hi Support Team,%0A%0ADescribe your issue here:%0A%0A----%0AApp Version: 1.0.2%0ADevice: Mobile%0ADate: ' + new Date().toLocaleDateString());
+  };
+
+  const handleSupportWhatsApp = () => {
+    setContactMethodPopup({ visible: false, message: '', type: 'info' });
+    Linking.openURL('https://wa.me/9337713798?text=Hello BudgetWise Support! I need help with the app.');
   };
 
   const handleRateApp = () => {
-    // For production, replace with actual app store URLs
-    Alert.alert(
-      'Rate BudgetWise',
-      'Would you like to rate our app?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Rate on Store',
-          onPress: () => showPopup('Redirecting to app store...', 'info')
-        }
-      ]
-    );
+    setRatePopup({
+      visible: true,
+      message: 'Love using BudgetWise? Help us grow by leaving a 5-star review on your app store!',
+      type: 'confirm',
+      title: 'Rate BudgetWise'
+    });
+  };
+
+  const handleRateConfirm = () => {
+    setRatePopup({ visible: false, message: '', type: 'confirm' });
+    
+    // Try to open Play Store/App Store
+    const playStoreUrl = 'market://details?id=com.budgetwise.app';
+    
+    Linking.canOpenURL(playStoreUrl).then(supported => {
+      if (supported) {
+        Linking.openURL(playStoreUrl);
+      } else {
+        // Fallback to web version
+        Linking.openURL('https://play.google.com/store/apps/details?id=com.budgetwise.app');
+      }
+    }).catch(() => {
+      showPopup('Unable to open app store. Please search for "BudgetWise" in your app store.', 'info');
+    });
   };
 
   const handleAbout = () => {
-    Alert.alert(
-      'About BudgetWise',
-      'BudgetWise v1.0.2\n\nA simple and powerful expense tracking app for individuals and groups.\n\nDeveloped by Akshay and Prem ',
-      [{ text: 'OK' }]
-    );
+    setAboutPopup({
+      visible: true,
+      message: '💰 BudgetWise v1.0.2\n\n📊 Smart expense tracking for individuals and groups\n\n✨ Features:\n• Offline-first functionality\n• Professional data export\n• Group expense management\n• Real-time analytics\n• Secure biometric authentication\n\n👨‍💻 Developed by Akshay & Prem\n\n🌟 Thank you for using BudgetWise!',
+      type: 'info',
+      title: 'About BudgetWise'
+    });
+  };
+
+  const handlePrivacyPolicy = () => {
+    setAboutPopup({ visible: false, message: '', type: 'info' });
+    navigation.navigate('PrivacyPolicy' as never);
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#2C5282" />
+          <Ionicons name="arrow-back" size={24} color={theme.colors.secondary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={[styles.headerTitle, { color: theme.colors.secondary }]}>Settings</Text>
         <View style={styles.headerRight} />
       </View>
 
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {/* Preferences Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Preferences</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.secondary }]}>Preferences</Text>
           
-          <TouchableOpacity 
-            style={styles.settingItem}
-            onPress={() => navigation.navigate('NotificationSettings')}
-          >
-            <View style={styles.settingLeft}>
-              <View style={[styles.settingIcon, { backgroundColor: '#00C897' }]}>
-                <Ionicons name="notifications" size={20} color="#fff" />
-              </View>
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Notification Settings</Text>
-                <Text style={styles.settingSubtitle}>Manage alerts, reminders, and reports</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.settingItem}
+          <SettingItem
+            icon="finger-print"
+            iconColor="#6C63FF"
+            title="Biometric Security"
+            subtitle="Fingerprint, Face ID & authentication settings"
             onPress={() => navigation.navigate('BiometricSettings')}
-          >
-            <View style={styles.settingLeft}>
-              <View style={[styles.settingIcon, { backgroundColor: '#6C63FF' }]}>
-                <Ionicons name="finger-print" size={20} color="#fff" />
-              </View>
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Biometric Security</Text>
-                <Text style={styles.settingSubtitle}>Fingerprint, Face ID & authentication settings</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
+          />
 
-          <View style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <View style={[styles.settingIcon, { backgroundColor: '#FF9500' }]}>
-                <Ionicons name="cloud-upload" size={20} color="#fff" />
-              </View>
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Auto Backup</Text>
-                <Text style={styles.settingSubtitle}>Automatically backup your data</Text>
-              </View>
-            </View>
-            <Switch
-              value={autoBackupEnabled}
-              onValueChange={handleAutoBackupToggle}
-              trackColor={{ false: '#E5E7EB', true: '#FF9500' }}
-              thumbColor={autoBackupEnabled ? '#fff' : '#f4f3f4'}
-            />
-          </View>
-
-          <View style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <View style={[styles.settingIcon, { backgroundColor: '#444444' }]}>
-                <Ionicons name="moon" size={20} color="#fff" />
-              </View>
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Dark Mode</Text>
-                <Text style={styles.settingSubtitle}>Switch to dark theme (coming soon)</Text>
-              </View>
-            </View>
-            <Switch
-              value={darkModeEnabled}
-              onValueChange={handleDarkModeToggle}
-              trackColor={{ false: '#E5E7EB', true: '#444444' }}
-              thumbColor={darkModeEnabled ? '#fff' : '#f4f3f4'}
-            />
-          </View>
-
-          <TouchableOpacity style={styles.settingItem}>
-            <View style={styles.settingLeft}>
-              <View style={[styles.settingIcon, { backgroundColor: '#4A90E2' }]}>
-                <FontAwesome name="dollar" size={20} color="#fff" />
-              </View>
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Currency</Text>
-                <Text style={styles.settingSubtitle}>USD - US Dollar</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#B0B0B0" />
-          </TouchableOpacity>
+          <SettingItem
+            icon="moon"
+            iconColor="#444444"
+            title="Dark Mode"
+            subtitle="Switch between light and dark theme"
+            showSwitch={true}
+            showChevron={false}
+            switchValue={isDarkMode}
+            onSwitchChange={handleDarkModeToggle}
+            switchColor="#444444"
+          />
         </View>
 
         {/* Data Management Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data Management</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.secondary }]}>Data Management</Text>
 
-          <TouchableOpacity style={styles.settingItem} onPress={handleExportData}>
-            <View style={styles.settingLeft}>
-              <View style={[styles.settingIcon, { backgroundColor: '#00C897' }]}>
-                <Ionicons name="download" size={20} color="#fff" />
-              </View>
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Export Data</Text>
-                <Text style={styles.settingSubtitle}>Download your data as backup</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#B0B0B0" />
-          </TouchableOpacity>
+          <SettingItem
+            icon="download"
+            iconColor="#00C897"
+            title="Export Data"
+            subtitle="Download your data as backup"
+            onPress={handleExportData}
+          />
 
-          <TouchableOpacity style={styles.settingItem} onPress={handleImportData}>
-            <View style={styles.settingLeft}>
-              <View style={[styles.settingIcon, { backgroundColor: '#FF9500' }]}>
-                <Ionicons name="cloud-upload" size={20} color="#fff" />
-              </View>
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Import Data</Text>
-                <Text style={styles.settingSubtitle}>Restore data from backup</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#B0B0B0" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.settingItem} onPress={handleClearData}>
-            <View style={styles.settingLeft}>
-              <View style={[styles.settingIcon, { backgroundColor: '#FF4C5E' }]}>
-                <Ionicons name="trash" size={20} color="#fff" />
-              </View>
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Clear All Data</Text>
-                <Text style={styles.settingSubtitle}>Permanently delete all app data</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#B0B0B0" />
-          </TouchableOpacity>
+          <SettingItem
+            icon="cloud-upload"
+            iconColor="#FF9500"
+            title="Import Data"
+            subtitle="Restore data from backup"
+            onPress={handleImportData}
+          />
         </View>
 
         {/* Support Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Support & Info</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.secondary }]}>Support & Info</Text>
 
-          <TouchableOpacity style={styles.settingItem} onPress={handleContactSupport}>
-            <View style={styles.settingLeft}>
-              <View style={[styles.settingIcon, { backgroundColor: '#4A90E2' }]}>
-                <Ionicons name="chatbubble" size={20} color="#fff" />
-              </View>
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Contact Support</Text>
-                <Text style={styles.settingSubtitle}>Get help and report issues</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#B0B0B0" />
-          </TouchableOpacity>
 
-          <TouchableOpacity style={styles.settingItem} onPress={handleRateApp}>
-            <View style={styles.settingLeft}>
-              <View style={[styles.settingIcon, { backgroundColor: '#FF9500' }]}>
-                <Ionicons name="star" size={20} color="#fff" />
-              </View>
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Rate BudgetWise</Text>
-                <Text style={styles.settingSubtitle}>Leave a review on the app store</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#B0B0B0" />
-          </TouchableOpacity>
+          <SettingItem
+            icon="chatbubble"
+            iconColor="#4A90E2"
+            title="Contact Support"
+            subtitle="Get help and report issues"
+            onPress={handleContactSupport}
+          />
 
-          <TouchableOpacity style={styles.settingItem} onPress={handleAbout}>
-            <View style={styles.settingLeft}>
-              <View style={[styles.settingIcon, { backgroundColor: '#6C63FF' }]}>
-                <Ionicons name="information-circle" size={20} color="#fff" />
-              </View>
-              <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>About BudgetWise</Text>
-                <Text style={styles.settingSubtitle}>Version 1.0.2</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#B0B0B0" />
-          </TouchableOpacity>
+          <SettingItem
+            icon="star"
+            iconColor="#FF9500"
+            title="Rate BudgetWise"
+            subtitle="Leave a review on the app store"
+            onPress={handleRateApp}
+          />
+
+          <SettingItem
+            icon="information-circle"
+            iconColor="#6C63FF"
+            title="About BudgetWise"
+            subtitle="Version 1.0.2"
+            onPress={handleAbout}
+          />
         </View>
       </ScrollView>
 
@@ -401,6 +287,56 @@ export default function SettingsScreen() {
         type={popup.type}
         onClose={closePopup}
       />
+
+      {/* Support Contact Popup */}
+      <CustomPopup
+        visible={supportPopup.visible}
+        message={supportPopup.message}
+        type={supportPopup.type}
+        title={supportPopup.title}
+        onClose={() => setSupportPopup({ visible: false, message: '', type: 'confirm' })}
+        onConfirm={handleShowContactMethods}
+        confirmText="Get Support"
+      />
+
+      {/* Rate App Popup */}
+      <CustomPopup
+        visible={ratePopup.visible}
+        message={ratePopup.message}
+        type={ratePopup.type}
+        title={ratePopup.title}
+        onClose={() => setRatePopup({ visible: false, message: '', type: 'confirm' })}
+        onConfirm={handleRateConfirm}
+        confirmText="Rate Now"
+      />
+
+      {/* About App Popup */}
+      <CustomPopup
+        visible={aboutPopup.visible}
+        message={aboutPopup.message}
+        type={aboutPopup.type}
+        title={aboutPopup.title}
+        onClose={() => setAboutPopup({ visible: false, message: '', type: 'info' })}
+        onConfirm={handlePrivacyPolicy}
+        confirmText="Privacy Policy"
+      />
+
+      {/* Contact Methods Popup */}
+      <ContactMethodsPopup
+        visible={contactMethodPopup.visible}
+        onClose={handleCloseContactMethods}
+        onEmailPress={handleSupportEmail}
+        onWhatsAppPress={handleSupportWhatsApp}
+        title="Contact Support"
+        message="Choose how you would like to contact our support team:"
+      />
+
+      <ExportModal
+        visible={exportModalVisible}
+        onClose={() => setExportModalVisible(false)}
+        onSuccess={handleExportSuccess}
+        onError={handleExportError}
+      />
     </View>
   );
 }
@@ -408,7 +344,6 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F8FF',
   },
   header: {
     flexDirection: 'row',
@@ -424,7 +359,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#2C5282',
   },
   headerRight: {
     width: 40, // Balance the header
@@ -439,14 +373,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2C5282',
     marginBottom: 16,
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -475,11 +407,9 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2C5282',
     marginBottom: 2,
   },
   settingSubtitle: {
     fontSize: 14,
-    color: '#4A90E2',
   },
 });

@@ -11,6 +11,9 @@ import { expenseAPI, userAPI, depositAPI } from '../../data/services/api';
 import { TokenManager } from '../../data/TokenManager';
 import ContextIndicator from '../components/ContextIndicator';
 import AdaptiveStatusBar from '../components/AdaptiveStatusBar';
+import NetworkStatusBar from '../components/NetworkStatusBar';
+import { useTheme } from '../../core/theme/ThemeContext';
+import { offlineManager } from '../../services/OfflineManager';
 
 type DashboardScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Dashboard'>;
 
@@ -83,6 +86,7 @@ const demoTransactions = [
 ];
 
 export default function DashboardScreen({ navigation }: Props) {
+  const { theme } = useTheme();
   const [logoutPopup, setLogoutPopup] = useState({ visible: false });
   const [userName, setUserName] = useState<string>('');
   const [expenses, setExpenses] = useState<any[]>([]);
@@ -98,6 +102,23 @@ export default function DashboardScreen({ navigation }: Props) {
 
   // Network error state
   const [networkError, setNetworkError] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+
+  // Network status monitoring
+  useEffect(() => {
+    // Subscribe to network status changes
+    const unsubscribe = offlineManager.onNetworkStatusChange((online) => {
+      setIsOnline(online);
+      if (online) {
+        setNetworkError(false);
+      }
+    });
+
+    // Get initial network status
+    setIsOnline(offlineManager.getNetworkStatus());
+
+    return unsubscribe;
+  }, []);
   
   // Search functionality state
   const [searchQuery, setSearchQuery] = useState('');
@@ -125,7 +146,7 @@ export default function DashboardScreen({ navigation }: Props) {
     return `${typeComponent}_${index}_${timestamp}_${counterComponent}_${randomComponent}`;
   };
 
-  // Function to fetch both expenses and deposits from API
+  // Function to fetch both expenses and deposits using offline manager
   const fetchTransactions = async (showLoading = true) => {
     if (showLoading) setLoading(true);
     
@@ -133,47 +154,14 @@ export default function DashboardScreen({ navigation }: Props) {
     keyCounterRef.current = 0;
     
     try {
-      // Use TokenManager to get current context token (personal or group)
-      const token = await TokenManager.getCurrentToken();
+      console.log('🔄 Fetching transactions using offline manager...');
       
-      if (!token) {
-        console.log('❌ No token available - user may need to login again');
-        // Show network error instead of demo data
-        setNetworkError(true);
-        setExpenses([]);
-        setDeposits([]);
-        setAllTransactions([]);
-        setBalance({ total: 0, income: 0, expense: 0 });
-        return;
-      }
+      const { expenses: expenseList, deposits: depositList } = await offlineManager.getAllTransactions();
       
-      console.log('🔍 Fetching context-aware transactions from API...');
-      console.log('🔑 Using token (first 20 chars):', token.substring(0, 20) + '...');
-      
-      // Fetch both expenses and deposits in parallel
-      const [expensesData, depositsData] = await Promise.all([
-        expenseAPI.getAllRelatedExpenseRecords(token),
-        depositAPI.getAllRelatedDeposits(token)
-      ]);
-      
-      console.log('✅ Context-aware expenses loaded:', expensesData);
-      console.log('✅ Context-aware deposits loaded:', depositsData);
-          
-      // Handle the API response structure with $values for expenses
-      let expenseList = [];
-      if (expensesData && expensesData.$values) {
-        expenseList = expensesData.$values;
-      } else if (Array.isArray(expensesData)) {
-        expenseList = expensesData;
-      }
-      
-      // Handle the API response structure with $values for deposits
-      let depositList = [];
-      if (depositsData && depositsData.$values) {
-        depositList = depositsData.$values;
-      } else if (Array.isArray(depositsData)) {
-        depositList = depositsData;
-      }
+      console.log('✅ Offline manager data loaded:', {
+        expenses: expenseList.length,
+        deposits: depositList.length
+      });
       
       // Transform expenses data to dashboard format
       const transformedExpenses = expenseList.map((expense: any, index: number) => {
@@ -276,60 +264,6 @@ export default function DashboardScreen({ navigation }: Props) {
       
       // Clear network error state on successful fetch
       setNetworkError(false);
-      
-      // Notification triggers - check spending patterns and send alerts
-      try {
-        const { NotificationService } = await import('../../services/NotificationService');
-        
-        // Check for low balance
-        await NotificationService.checkAndNotifyBalance(totalIncome - totalExpense);
-        
-        // Check for large expenses
-        for (const expense of transformedExpenses) {
-          const amount = Math.abs(expense.amount);
-          if (amount > 0) {
-            await NotificationService.checkAndNotifySpending(amount, expense.category);
-          }
-        }
-        
-        // Check weekly summary (if it's Monday and we have data)
-        const today = new Date();
-        if (today.getDay() === 1 && allTransactions.length > 0) { // Monday
-          // Calculate weekly totals (last 7 days)
-          const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-          const weeklyTransactions = allTransactions.filter(t => 
-            new Date(t.originalData.createdAt) >= weekAgo
-          );
-          
-          const weeklyExpenses = weeklyTransactions
-            .filter(t => t.type === 'expense')
-            .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-          
-          const weeklyIncome = weeklyTransactions
-            .filter(t => t.type === 'deposit')
-            .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-          
-          if (weeklyTransactions.length > 0) {
-            await NotificationService.sendWeeklySummary(
-              weeklyExpenses, 
-              weeklyIncome, 
-              weeklyTransactions.length
-            );
-          }
-        }
-        
-        // Send motivational notifications based on spending patterns
-        if (totalExpense === 0 && today.getHours() > 18) {
-          // No expenses logged and it's evening
-          await NotificationService.sendMotivationalNotification('no_expenses');
-        } else if (totalIncome > totalExpense && totalExpense > 0) {
-          // Good spending habits
-          await NotificationService.sendMotivationalNotification('good_spending');
-        }
-        
-      } catch (notificationError) {
-        console.log('⚠️ Notifications not available in current environment:', notificationError);
-      }
       
       console.log('✅ Dashboard data updated with expenses and deposits');
     } catch (error: any) {
@@ -484,20 +418,6 @@ export default function DashboardScreen({ navigation }: Props) {
     
     fetchUserData();
     fetchTransactions(); // Fetch expenses and deposits on component mount
-    
-    // Initialize notifications
-    const initNotifications = async () => {
-      try {
-        const { NotificationService } = await import('../../services/NotificationService');
-        await NotificationService.initialize();
-        NotificationService.setupNotificationListeners();
-        console.log('✅ Notifications initialized');
-      } catch (error) {
-        console.log('⚠️ Notifications not available in current environment:', error);
-      }
-    };
-    
-    initNotifications();
   }, []);
 
   // Update filtered expenses when allTransactions change
@@ -591,34 +511,35 @@ export default function DashboardScreen({ navigation }: Props) {
     };
 
     return (
-      <View style={[styles.transactionItem, { backgroundColor: '#F8FCFF' }]}>  
+      <View style={[styles.transactionItem, { backgroundColor: theme.colors.card }]}>  
         <View style={[styles.iconCircle, { backgroundColor: item.iconColor + '22' }]}>  
           {renderIcon()}
         </View>
         <View style={styles.transactionDetails}>
           <Text style={[styles.transactionCategory, { backgroundColor: item.iconColor }]}>{item.category}</Text>
-          <Text style={styles.transactionDesc}>{item.desc}</Text>
+          <Text style={[styles.transactionDesc, { color: theme.colors.textSecondary }]}>{item.desc}</Text>
         </View>
         <View style={styles.transactionMeta}>
           <Text style={[styles.transactionAmount, { color: item.amount > 0 ? '#3ED598' : '#FF7A7A' }]}>
             {item.amount > 0 ? '+' : '-'}₹{Math.abs(item.amount).toFixed(2)}
           </Text>
-          <Text style={styles.transactionDate}>{item.date}</Text>
+          <Text style={[styles.transactionDate, { color: theme.colors.textSecondary }]}>{item.date}</Text>
         </View>
       </View>
     );
   };
 
   return (
-    <View style={styles.container}>
-      <AdaptiveStatusBar backgroundColor="#F0F8FF" />
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <AdaptiveStatusBar backgroundColor={theme.colors.background} />
+      
       <ScrollView
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#4A90E2']}
-            tintColor="#4A90E2"
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
           />
         }
         showsVerticalScrollIndicator={false}
@@ -626,24 +547,24 @@ export default function DashboardScreen({ navigation }: Props) {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.helloText}>Hello,</Text>
-            <Text style={styles.userName}>{userName}</Text>
+            <Text style={[styles.helloText, { color: theme.colors.textSecondary }]}>Hello,</Text>
+            <Text style={[styles.userName, { color: theme.colors.text }]}>{userName}</Text>
           </View>
           <TouchableOpacity style={styles.searchIcon} onPress={toggleSearch}>
-            <Ionicons name={showSearch ? "close" : "search"} size={24} color="#B0B0B0" />
+            <Ionicons name={showSearch ? "close" : "search"} size={24} color={theme.colors.disabled} />
           </TouchableOpacity>
         </View>
 
         {/* Search Bar */}
         {showSearch && (
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#B0B0B0" style={{ marginRight: 10 }} />
+          <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
+            <Ionicons name="search" size={20} color={theme.colors.disabled} style={{ marginRight: 10 }} />
             <TextInput
               value={searchQuery}
               onChangeText={handleSearch}
               placeholder="Search transactions by category, description, or amount"
-              placeholderTextColor="#B0B0B0"
-              style={styles.searchInput}
+              placeholderTextColor={theme.colors.placeholder}
+              style={[styles.searchInput, { color: theme.colors.text }]}
               autoFocus={showSearch}
             />
             {searchQuery.length > 0 && (
@@ -663,44 +584,44 @@ export default function DashboardScreen({ navigation }: Props) {
         {/* Loading Indicator */}
         {loading && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4A90E2" />
-            <Text style={styles.loadingText}>Loading expenses...</Text>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading expenses...</Text>
           </View>
         )}
 
         {/* Balance Card */}
-        <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Total Balance</Text>
-          <Text style={styles.balanceValue}>₹ {balance.total.toFixed(2)}</Text>
+        <View style={[styles.balanceCard, { backgroundColor: theme.colors.card }]}>
+          <Text style={[styles.balanceLabel, { color: theme.colors.textSecondary }]}>Total Balance</Text>
+          <Text style={[styles.balanceValue, { color: theme.colors.secondary }]}>₹ {balance.total.toFixed(2)}</Text>
           <View style={styles.balanceRow}>
             <View style={styles.balanceCol}>
               <Ionicons name="arrow-down" size={18} color="#3ED598" />
-              <Text style={styles.incomeLabel}>Income</Text>
+              <Text style={[styles.incomeLabel, { color: theme.colors.textSecondary }]}>Income</Text>
               <Text style={styles.incomeValue}>₹{balance.income.toFixed(2)}</Text>
             </View>
             <View style={styles.balanceCol}>
               <Ionicons name="arrow-up" size={18} color="#FF7A7A" />
-              <Text style={styles.expenseLabel}>Expense</Text>
+              <Text style={[styles.expenseLabel, { color: theme.colors.textSecondary }]}>Expense</Text>
               <Text style={styles.expenseValue}>₹{balance.expense.toFixed(2)}</Text>
             </View>
           </View>
         </View>
 
         {/* Recent Transactions */}
-        <Text style={styles.recentTitle}>Recent Transactions</Text>
+        <Text style={[styles.recentTitle, { color: theme.colors.secondary }]}>Recent Transactions</Text>
         {networkError ? (
           <View style={styles.emptyState}>
             <Ionicons name="cloud-offline" size={48} color="#FF7A7A" />
-            <Text style={styles.emptyStateText}>Network Issue</Text>
-            <Text style={styles.emptyStateSubtext}>Unable to connect to server. Please check your internet connection and try again.</Text>
+            <Text style={[styles.emptyStateText, { color: theme.colors.secondary }]}>Network Issue</Text>
+            <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>Unable to connect to server. Please check your internet connection and try again.</Text>
           </View>
         ) : filteredExpenses.length === 0 && !loading ? (
           <View style={styles.emptyState}>
             <Ionicons name="receipt-outline" size={48} color="#B0B0B0" />
-            <Text style={styles.emptyStateText}>
+            <Text style={[styles.emptyStateText, { color: theme.colors.secondary }]}>
               {searchQuery.trim() ? "No matching transactions found" : "No transactions yet"}
             </Text>
-            <Text style={styles.emptyStateSubtext}>
+            <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
               {searchQuery.trim() ? "Try adjusting your search terms" : "Tap the + button to add your first transaction"}
             </Text>
           </View>
@@ -719,10 +640,10 @@ export default function DashboardScreen({ navigation }: Props) {
 
       {/* Floating Add Button */}
       <TouchableOpacity 
-        style={styles.fab}
+        style={[styles.fab, { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary }]}
         onPress={() => navigation.navigate('AddExpense')}
       >
-        <Ionicons name="add" size={32} color="#fff" />
+        <Ionicons name="add" size={32} color={theme.isDark ? '#222' : '#fff'} />
       </TouchableOpacity>
       <CustomPopup 
         visible={logoutPopup.visible}
@@ -740,7 +661,6 @@ export default function DashboardScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F8FF', // Light blue background
     paddingHorizontal: 0,
     paddingTop: 40,
   },
@@ -752,23 +672,20 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   helloText: {
-    color: '#4A90E2', // Blue text
     fontSize: 15,
     fontWeight: '400',
   },
   userName: {
-    color: '#2C5282', // Dark blue text
     fontSize: 22,
     fontWeight: 'bold',
     marginTop: 2,
   },
   searchIcon: {
-    backgroundColor: '#E6F3FF', // Lighter blue
+    backgroundColor: '#E6F3FF', // Keep this light blue for now
     borderRadius: 20,
     padding: 8,
   },
   balanceCard: {
-    backgroundColor: '#FFFFFF', // White card
     borderRadius: 20,
     marginHorizontal: 18,
     padding: 22,
@@ -780,12 +697,10 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   balanceLabel: {
-    color: '#4A90E2',
     fontSize: 15,
     marginBottom: 6,
   },
   balanceValue: {
-    color: '#2C5282',
     fontSize: 32,
     fontWeight: 'bold',
     marginBottom: 10,
@@ -800,7 +715,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   incomeLabel: {
-    color: '#4A90E2',
     fontSize: 13,
     marginTop: 2,
   },
@@ -811,7 +725,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   expenseLabel: {
-    color: '#4A90E2',
     fontSize: 13,
     marginTop: 2,
   },
@@ -822,7 +735,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   recentTitle: {
-    color: '#2C5282',
     fontSize: 18,
     fontWeight: 'bold',
     marginLeft: 24,
@@ -835,7 +747,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 18,
     marginBottom: 12,
     padding: 16,
-    backgroundColor: '#F8FCFF', // Lighter card background
     shadowColor: '#4A90E2',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -849,7 +760,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
-    backgroundColor: '#E6F3FF', // Lighter blue for icon background
   },
   transactionDetails: {
     flex: 1,
@@ -865,7 +775,6 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   transactionDesc: {
-    color: '#4A90E2',
     fontSize: 13,
     marginTop: 2,
   },
@@ -878,7 +787,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   transactionDate: {
-    color: '#4A90E2',
     fontSize: 12,
     marginTop: 2,
   },
@@ -886,7 +794,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 24,
     bottom: 32,
-    backgroundColor: '#4A90E2', // Blue FAB
+    backgroundColor: '#4A90E2', // Keep blue FAB
     width: 56,
     height: 56,
     borderRadius: 28,
@@ -907,7 +815,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginLeft: 10,
     fontSize: 16,
-    color: '#4A90E2',
   },
   emptyState: {
     alignItems: 'center',
@@ -917,20 +824,17 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 18,
-    color: '#2C5282',
     fontWeight: '600',
     marginTop: 16,
     textAlign: 'center',
   },
   emptyStateSubtext: {
     fontSize: 14,
-    color: '#4A90E2',
     marginTop: 8,
     textAlign: 'center',
     lineHeight: 20,
   },
   searchContainer: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 10,
     marginHorizontal: 18,
     marginBottom: 18,
@@ -947,7 +851,6 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#2C5282',
     paddingVertical: 0,
   },
   closeSearch: {

@@ -22,12 +22,14 @@ import { TokenManager } from '../../data/TokenManager';
 import CustomPopup, { PopupType } from '../components/CustomPopup';
 import Avatar from '../components/Avatar';
 import { AvatarColorStorage } from '../../utils/AvatarColorStorage';
+import { useTheme } from '../../core/theme/ThemeContext';
 
 export default function EditProfileScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [originalName, setOriginalName] = useState('');
+  const { theme } = useTheme();
   const [originalEmail, setOriginalEmail] = useState('');
   const [originalPhone, setOriginalPhone] = useState('');
   const [loading, setLoading] = useState(false);
@@ -270,34 +272,34 @@ export default function EditProfileScreen() {
 
   if (initialLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4A90E2" />
-        <Text style={styles.loadingText}>Loading profile...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={[styles.loadingText, { color: theme.colors.primary }]}>Loading profile...</Text>
       </View>
     );
   }
 
   return (
     <KeyboardAvoidingView 
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleCancel}>
-            <Ionicons name="arrow-back" size={24} color="#2C5282" />
+        <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
+          <TouchableOpacity style={[styles.backButton, { backgroundColor: theme.colors.card }]} onPress={handleCancel}>
+            <Ionicons name="arrow-back" size={24} color={theme.colors.primary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit Profile</Text>
+          <Text style={[styles.headerTitle, { color: theme.colors.secondary }]}>Edit Profile</Text>
           <TouchableOpacity 
-            style={[styles.saveButton, { opacity: hasChanges() ? 1 : 0.5 }]}
+            style={[styles.saveButton, { backgroundColor: theme.colors.card, opacity: hasChanges() ? 1 : 0.5 }]}
             onPress={handleSave}
             disabled={!hasChanges() || loading}
           >
             {loading ? (
-              <ActivityIndicator size="small" color="#4A90E2" />
+              <ActivityIndicator size="small" color={theme.colors.primary} />
             ) : (
-              <Text style={styles.saveButtonText}>Save</Text>
+              <Text style={[styles.saveButtonText, { color: theme.colors.primary }]}>Save</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -310,46 +312,46 @@ export default function EditProfileScreen() {
               size={120}
               fontSize={42}
               borderWidth={4}
-              borderColor="#E6F3FF"
+              borderColor={theme.colors.surface}
               {...(avatarColor && { backgroundColor: avatarColor })}
             />
           </View>
           <TouchableOpacity 
-            style={styles.changePhotoButton}
+            style={[styles.changePhotoButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.surface }]}
             onPress={openColorPicker}
           >
-            <Ionicons name="color-palette" size={20} color="#4A90E2" />
-            <Text style={styles.changePhotoText}>Change Avatar Color</Text>
+            <Ionicons name="color-palette" size={20} color={theme.colors.primary} />
+            <Text style={[styles.changePhotoText, { color: theme.colors.primary }]}>Change Avatar Color</Text>
           </TouchableOpacity>
         </View>
 
         {/* Form */}
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Full Name</Text>
-            <View style={styles.inputContainer}>
-              <Ionicons name="person-outline" size={20} color="#4A90E2" style={styles.inputIcon} />
+            <Text style={[styles.label, { color: theme.colors.textSecondary }]}>Full Name</Text>
+            <View style={[styles.inputContainer, { backgroundColor: theme.colors.card, borderColor: theme.colors.surface }]}>
+              <Ionicons name="person-outline" size={20} color={theme.colors.primary} style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: theme.colors.text }]}
                 value={name}
                 onChangeText={setName}
                 placeholder="Enter your full name"
-                placeholderTextColor="#B0B0B0"
+                placeholderTextColor={theme.colors.textSecondary}
                 autoCapitalize="words"
               />
             </View>
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email Address</Text>
-            <View style={styles.inputContainer}>
-              <Ionicons name="mail-outline" size={20} color="#4A90E2" style={styles.inputIcon} />
+            <Text style={[styles.label, { color: theme.colors.textSecondary }]}>Email Address</Text>
+            <View style={[styles.inputContainer, { backgroundColor: theme.colors.card, borderColor: theme.colors.surface }]}>
+              <Ionicons name="mail-outline" size={20} color={theme.colors.primary} style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: theme.colors.text }]}
                 value={email}
                 onChangeText={setEmail}
                 placeholder="Enter your email address"
-                placeholderTextColor="#B0B0B0"
+                placeholderTextColor={theme.colors.textSecondary}
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
@@ -357,15 +359,15 @@ export default function EditProfileScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Phone Number</Text>
-            <View style={styles.inputContainer}>
-              <Ionicons name="call-outline" size={20} color="#4A90E2" style={styles.inputIcon} />
+            <Text style={[styles.label, { color: theme.colors.textSecondary }]}>Phone Number</Text>
+            <View style={[styles.inputContainer, { backgroundColor: theme.colors.card, borderColor: theme.colors.surface }]}>
+              <Ionicons name="call-outline" size={20} color={theme.colors.primary} style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: theme.colors.text }]}
                 value={phone}
                 onChangeText={setPhone}
                 placeholder="Enter your phone number"
-                placeholderTextColor="#B0B0B0"
+                placeholderTextColor={theme.colors.textSecondary}
                 keyboardType="phone-pad"
               />
             </View>
@@ -373,28 +375,20 @@ export default function EditProfileScreen() {
 
           {/* Additional Profile Options */}
           <View style={styles.additionalOptions}>
-            <TouchableOpacity style={styles.optionItem}>
-              <View style={styles.optionIcon}>
+            <TouchableOpacity style={[styles.optionItem, { backgroundColor: theme.colors.card, borderColor: theme.colors.surface }]}>
+              <View style={[styles.optionIcon, { backgroundColor: theme.colors.surface }]}>
                 <Ionicons name="lock-closed-outline" size={20} color="#FF9500" />
               </View>
-              <Text style={styles.optionText}>Change Password</Text>
-              <Ionicons name="chevron-forward" size={20} color="#B0B0B0" />
+              <Text style={[styles.optionText, { color: theme.colors.text }]}>Change Password</Text>
+              <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.optionItem}>
-              <View style={styles.optionIcon}>
-                <Ionicons name="notifications-outline" size={20} color="#00C897" />
-              </View>
-              <Text style={styles.optionText}>Notification Settings</Text>
-              <Ionicons name="chevron-forward" size={20} color="#B0B0B0" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.optionItem}>
-              <View style={styles.optionIcon}>
+            <TouchableOpacity style={[styles.optionItem, { backgroundColor: theme.colors.card, borderColor: theme.colors.surface }]}>
+              <View style={[styles.optionIcon, { backgroundColor: theme.colors.surface }]}>
                 <Ionicons name="shield-outline" size={20} color="#6C63FF" />
               </View>
-              <Text style={styles.optionText}>Privacy Settings</Text>
-              <Ionicons name="chevron-forward" size={20} color="#B0B0B0" />
+              <Text style={[styles.optionText, { color: theme.colors.text }]}>Privacy Settings</Text>
+              <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -407,27 +401,27 @@ export default function EditProfileScreen() {
           onRequestClose={closeColorPicker}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.colorPickerModal}>
+            <View style={[styles.colorPickerModal, { backgroundColor: theme.colors.card }]}>
               <View style={styles.colorPickerHeader}>
-                <Text style={styles.colorPickerTitle}>Choose Avatar Color</Text>
+                <Text style={[styles.colorPickerTitle, { color: theme.colors.secondary }]}>Choose Avatar Color</Text>
                 <TouchableOpacity onPress={closeColorPicker} style={styles.modalCloseButton}>
-                  <Ionicons name="close" size={24} color="#2C5282" />
+                  <Ionicons name="close" size={24} color={theme.colors.primary} />
                 </TouchableOpacity>
               </View>
               
-              <View style={styles.currentColorPreview}>
-                <Text style={styles.previewLabel}>Preview:</Text>
+              <View style={[styles.currentColorPreview, { backgroundColor: theme.colors.surface }]}>
+                <Text style={[styles.previewLabel, { color: theme.colors.primary }]}>Preview:</Text>
                 <Avatar 
                   name={name || 'User'} 
                   size={60}
                   fontSize={22}
                   {...(tempAvatarColor && { backgroundColor: tempAvatarColor })}
                   borderWidth={2}
-                  borderColor="#E6F3FF"
+                  borderColor={theme.colors.background}
                 />
               </View>
 
-              <Text style={styles.colorPickerSubtitle}>Select a color for your avatar background:</Text>
+              <Text style={[styles.colorPickerSubtitle, { color: theme.colors.primary }]}>Select a color for your avatar background:</Text>
               
               <FlatList
                 data={avatarColors}
@@ -441,13 +435,13 @@ export default function EditProfileScreen() {
               
               <View style={styles.colorPickerButtons}>
                 <TouchableOpacity 
-                  style={[styles.colorPickerButton, styles.resetButton]}
+                  style={[styles.colorPickerButton, styles.resetButton, { backgroundColor: theme.colors.textSecondary }]}
                   onPress={() => setTempAvatarColor('')}
                 >
                   <Text style={styles.resetButtonText}>Use Default</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
-                  style={[styles.colorPickerButton, styles.confirmButton]}
+                  style={[styles.colorPickerButton, styles.confirmButton, { backgroundColor: theme.colors.primary }]}
                   onPress={confirmColorSelection}
                 >
                   <Text style={styles.confirmButtonText}>Done</Text>
@@ -471,18 +465,15 @@ export default function EditProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F8FF',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F0F8FF',
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#4A90E2',
   },
   scrollContainer: {
     flex: 1,
@@ -497,20 +488,18 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 8,
+    borderRadius: 20,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#2C5282',
   },
   saveButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#E6F3FF',
   },
   saveButtonText: {
-    color: '#4A90E2',
     fontWeight: '600',
   },
   profileImageContainer: {
@@ -528,13 +517,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E6F3FF',
   },
   changePhotoText: {
     marginLeft: 8,
-    color: '#4A90E2',
     fontWeight: '500',
   },
   form: {
@@ -546,19 +532,15 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2C5282',
     marginBottom: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: '#E6F3FF',
-    shadowColor: '#4A90E2',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -570,7 +552,6 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#2C5282',
   },
   additionalOptions: {
     marginTop: 32,
@@ -578,13 +559,10 @@ const styles = StyleSheet.create({
   optionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E6F3FF',
-    shadowColor: '#4A90E2',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -594,7 +572,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F8FCFF',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -602,7 +579,6 @@ const styles = StyleSheet.create({
   optionText: {
     flex: 1,
     fontSize: 16,
-    color: '#2C5282',
     fontWeight: '500',
   },
   // Color Picker Modal Styles
@@ -615,7 +591,6 @@ const styles = StyleSheet.create({
   colorPickerModal: {
     width: '92%',
     maxWidth: 380,
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 20,
     maxHeight: '80%',
@@ -634,7 +609,6 @@ const styles = StyleSheet.create({
   colorPickerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#2C5282',
   },
   modalCloseButton: {
     padding: 4,
@@ -643,19 +617,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
     padding: 16,
-    backgroundColor: '#F8FCFF',
     borderRadius: 12,
     width: '100%',
   },
   previewLabel: {
     fontSize: 14,
-    color: '#4A90E2',
     marginBottom: 12,
     fontWeight: '500',
   },
   colorPickerSubtitle: {
     fontSize: 16,
-    color: '#4A90E2',
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -678,7 +649,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 2,
     borderWidth: 3,
     borderColor: '#E6F3FF',
-    shadowColor: '#4A90E2',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -699,10 +669,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   resetButton: {
-    backgroundColor: '#B0B0B0',
+    // Removed hardcoded backgroundColor - now using theme
   },
   confirmButton: {
-    backgroundColor: '#4A90E2',
+    // Removed hardcoded backgroundColor - now using theme
   },
   resetButtonText: {
     color: '#FFFFFF',

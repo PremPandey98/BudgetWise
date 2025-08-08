@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_CONFIG } from './src/core/config/constants';
 import { isTokenExpired } from './src/data/TokenExpiryUtils';
+import { ThemeProvider } from './src/core/theme/ThemeContext';
 
 // Suppress console errors in production-like experience
 if (!__DEV__) {
@@ -48,6 +49,7 @@ export default function App() {
         setIsLoading(false);
       }
     };
+
     checkToken();
   }, []);
 
@@ -60,9 +62,8 @@ export default function App() {
   }
 
   return (
-    <>
-      <StatusBar style="auto" />
+    <ThemeProvider>
       <AppNavigator />
-    </>
+    </ThemeProvider>
   );
 }

@@ -8,6 +8,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { useTheme } from '../../core/theme/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -25,6 +26,7 @@ export default function SplashScreen({ onAnimationComplete }: SplashScreenProps)
   const dotsOpacity = useRef(new Animated.Value(0)).current;
   
   const [currentDot, setCurrentDot] = useState(0);
+  const { theme } = useTheme();
 
   useEffect(() => {
     startAnimation();
@@ -108,8 +110,8 @@ export default function SplashScreen({ onAnimationComplete }: SplashScreenProps)
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor="#2C5282" />
-      <View style={styles.container}>
+      <StatusBar barStyle={theme.isDark ? "light-content" : "dark-content"} backgroundColor={theme.colors.primary} />
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.content}>
           {/* Logo Animation */}
           <Animated.View
@@ -121,11 +123,17 @@ export default function SplashScreen({ onAnimationComplete }: SplashScreenProps)
               },
             ]}
           >
-            <View style={styles.logoBackground}>
+            <View style={[
+              styles.logoBackground, 
+              { 
+                backgroundColor: theme.colors.primary,
+                borderColor: theme.isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.1)'
+              }
+            ]}>
               <MaterialIcons name="account-balance-wallet" size={60} color="#FFFFFF" />
             </View>
             <View style={styles.logoAccent}>
-              <Ionicons name="trending-up" size={24} color="#4A90E2" />
+              <Ionicons name="trending-up" size={24} color={theme.colors.secondary} />
             </View>
           </Animated.View>
 
@@ -139,8 +147,8 @@ export default function SplashScreen({ onAnimationComplete }: SplashScreenProps)
               },
             ]}
           >
-            <Text style={styles.appTitle}>BudgetWise</Text>
-            <View style={styles.titleUnderline} />
+            <Text style={[styles.appTitle, { color: theme.isDark ? '#FFFFFF' : '#000000' }]}>BudgetWise</Text>
+            <View style={[styles.titleUnderline, { backgroundColor: theme.isDark ? '#FFFFFF' : '#000000' }]} />
           </Animated.View>
 
           {/* Slogan */}
@@ -153,8 +161,8 @@ export default function SplashScreen({ onAnimationComplete }: SplashScreenProps)
               },
             ]}
           >
-            <Text style={styles.slogan}>Your Money, Your Way, Your Groups</Text>
-            <Text style={styles.subSlogan}>Smart expense tracking for everyone</Text>
+            <Text style={[styles.slogan, { color: theme.isDark ? '#FFFFFF' : '#000000' }]}>Your Money, Your Way, Your Groups</Text>
+            <Text style={[styles.subSlogan, { color: theme.isDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.7)' }]}>Smart expense tracking for everyone</Text>
           </Animated.View>
 
           {/* Loading Dots */}
@@ -164,7 +172,7 @@ export default function SplashScreen({ onAnimationComplete }: SplashScreenProps)
               { opacity: dotsOpacity },
             ]}
           >
-            <Text style={styles.loadingText}>Loading</Text>
+            <Text style={[styles.loadingText, { color: theme.isDark ? '#FFFFFF' : '#000000' }]}>Loading</Text>
             <View style={styles.dotsContainer}>
               {[0, 1, 2].map((index) => (
                 <View
@@ -172,6 +180,7 @@ export default function SplashScreen({ onAnimationComplete }: SplashScreenProps)
                   style={[
                     styles.dot,
                     {
+                      backgroundColor: theme.isDark ? '#FFFFFF' : '#000000',
                       opacity: currentDot >= index ? 1 : 0.3,
                       transform: [
                         {
@@ -188,15 +197,15 @@ export default function SplashScreen({ onAnimationComplete }: SplashScreenProps)
 
         {/* Background Pattern */}
         <View style={styles.backgroundPattern}>
-          <View style={[styles.circle, styles.circle1]} />
-          <View style={[styles.circle, styles.circle2]} />
-          <View style={[styles.circle, styles.circle3]} />
+          <View style={[styles.circle, styles.circle1, { backgroundColor: theme.isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }]} />
+          <View style={[styles.circle, styles.circle2, { backgroundColor: theme.isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }]} />
+          <View style={[styles.circle, styles.circle3, { backgroundColor: theme.isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }]} />
         </View>
 
         {/* Bottom Branding */}
         <View style={styles.bottomContainer}>
-          <Text style={styles.versionText}>Version 1.0.0</Text>
-          <Text style={styles.brandText}>by Akshay & Prem</Text>
+          <Text style={[styles.versionText, { color: theme.isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.6)' }]}>Version 1.0.0</Text>
+          <Text style={[styles.brandText, { color: theme.isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.8)' }]}>by Akshay & Prem</Text>
         </View>
       </View>
     </>
@@ -224,11 +233,9 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   logoAccent: {
     position: 'absolute',
@@ -253,7 +260,6 @@ const styles = StyleSheet.create({
   appTitle: {
     fontSize: 42,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     letterSpacing: 1,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 2 },
@@ -262,7 +268,6 @@ const styles = StyleSheet.create({
   titleUnderline: {
     width: 60,
     height: 4,
-    backgroundColor: '#FFFFFF',
     borderRadius: 2,
     marginTop: 8,
   },
@@ -273,7 +278,6 @@ const styles = StyleSheet.create({
   },
   slogan: {
     fontSize: 18,
-    color: '#FFFFFF',
     textAlign: 'center',
     fontWeight: '600',
     letterSpacing: 0.5,
@@ -281,7 +285,6 @@ const styles = StyleSheet.create({
   },
   subSlogan: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
     marginTop: 8,
     fontWeight: '400',
@@ -291,7 +294,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#FFFFFF',
     marginBottom: 16,
     fontWeight: '500',
   },
@@ -303,7 +305,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#FFFFFF',
     marginHorizontal: 4,
   },
   backgroundPattern: {
@@ -314,7 +315,6 @@ const styles = StyleSheet.create({
   circle: {
     position: 'absolute',
     borderRadius: 1000,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   circle1: {
     width: 300,
@@ -341,12 +341,10 @@ const styles = StyleSheet.create({
   },
   versionText: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
     marginBottom: 4,
   },
   brandText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
     fontWeight: '500',
   },
 });

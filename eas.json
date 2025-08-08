@@ -15,14 +15,12 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease",
-        "applicationArchivePath": "BudgetWise-v1.0.2.apk"
+        "gradleCommand": ":app:assembleRelease"
       }
     },
     "production": {
       "android": {
-        "buildType": "app-bundle",
-        "applicationArchivePath": "BudgetWise-v1.0.2.aab"
+        "buildType": "app-bundle"
       }
     }
   },

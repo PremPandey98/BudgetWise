@@ -13,6 +13,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { BiometricService, BiometricSettings } from '../../services/BiometricService';
 import AdaptiveStatusBar from '../components/AdaptiveStatusBar';
 import CustomPopup from '../components/CustomPopup';
+import { useTheme } from '../../core/theme/ThemeContext';
 
 type BiometricSettingsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'BiometricSettings'>;
 
@@ -28,6 +29,7 @@ export default function BiometricSettingsScreen({ navigation }: Props) {
   const [isAvailable, setIsAvailable] = useState(false);
   const [supportedTypes, setSupportedTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const { theme } = useTheme();
 
   // Popup states
   const [showPopup, setShowPopup] = useState(false);
@@ -138,33 +140,33 @@ export default function BiometricSettingsScreen({ navigation }: Props) {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <AdaptiveStatusBar backgroundColor="#F0F8FF" />
-        <Text style={styles.loadingText}>Loading biometric settings...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <AdaptiveStatusBar backgroundColor={theme.colors.background} />
+        <Text style={[styles.loadingText, { color: theme.colors.primary }]}>Loading biometric settings...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <AdaptiveStatusBar backgroundColor="#F0F8FF" />
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <AdaptiveStatusBar backgroundColor={theme.colors.background} />
       
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
         <TouchableOpacity 
-          style={styles.backButton} 
+          style={[styles.backButton, { backgroundColor: theme.colors.card }]} 
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color="#2C5282" />
+          <Ionicons name="arrow-back" size={24} color={theme.colors.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Biometric Security</Text>
+        <Text style={[styles.headerTitle, { color: theme.colors.secondary }]}>Biometric Security</Text>
         <View style={styles.placeholder} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         
         {/* Status Section */}
-        <View style={styles.statusSection}>
+        <View style={[styles.statusSection, { backgroundColor: theme.colors.card }]}>
           <View style={styles.statusIconContainer}>
             <Ionicons 
               name={isAvailable ? getBiometricIcon() : 'close-circle'} 
@@ -172,10 +174,10 @@ export default function BiometricSettingsScreen({ navigation }: Props) {
               color={isAvailable ? '#3ED598' : '#FF7A7A'} 
             />
           </View>
-          <Text style={styles.statusTitle}>
+          <Text style={[styles.statusTitle, { color: theme.colors.secondary }]}>
             {isAvailable ? 'Fingerprint Authentication' : 'Not Available'}
           </Text>
-          <Text style={styles.statusDescription}>
+          <Text style={[styles.statusDescription, { color: theme.colors.textSecondary }]}>
             {isAvailable 
               ? 'Your device supports fingerprint authentication for secure login'
               : 'Fingerprint authentication is not available on this device'
@@ -185,14 +187,14 @@ export default function BiometricSettingsScreen({ navigation }: Props) {
 
         {/* Settings Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔐 Security Settings</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.secondary }]}>🔐 Security Settings</Text>
           
-          <View style={styles.settingCard}>
+          <View style={[styles.settingCard, { backgroundColor: theme.colors.card }]}>
             <View style={styles.settingHeader}>
-              <Ionicons name="finger-print" size={20} color="#4A90E2" />
-              <Text style={styles.settingTitle}>Enable Fingerprint Login</Text>
+              <Ionicons name="finger-print" size={20} color={theme.colors.primary} />
+              <Text style={[styles.settingTitle, { color: theme.colors.text }]}>Enable Fingerprint Login</Text>
             </View>
-            <Text style={styles.settingDesc}>
+            <Text style={[styles.settingDesc, { color: theme.colors.textSecondary }]}>
               {isAvailable
                 ? 'Use your fingerprint to quickly and securely access BudgetWise'
                 : 'Fingerprint authentication is not available on this device'
@@ -203,8 +205,8 @@ export default function BiometricSettingsScreen({ navigation }: Props) {
                 value={settings.isEnabled && isAvailable}
                 onValueChange={handleToggleBiometric}
                 disabled={!isAvailable}
-                trackColor={{ false: '#E0E0E0', true: '#4A90E2' }}
-                thumbColor={settings.isEnabled && isAvailable ? '#FFFFFF' : '#F4F3F4'}
+                trackColor={{ false: theme.colors.background, true: theme.colors.primary }}
+                thumbColor={settings.isEnabled && isAvailable ? '#FFFFFF' : theme.colors.textSecondary}
               />
             </View>
           </View>
@@ -212,14 +214,14 @@ export default function BiometricSettingsScreen({ navigation }: Props) {
 
         {/* Face ID Coming Soon Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔮 Future Features</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.secondary }]}>🔮 Future Features</Text>
           
-          <View style={styles.comingSoonCard}>
+          <View style={[styles.comingSoonCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.background }]}>
             <View style={styles.comingSoonHeader}>
-              <Ionicons name="scan" size={20} color="#B0B0B0" />
-              <Text style={styles.comingSoonTitle}>Face ID Authentication</Text>
+              <Ionicons name="scan" size={20} color={theme.colors.textSecondary} />
+              <Text style={[styles.comingSoonTitle, { color: theme.colors.textSecondary }]}>Face ID Authentication</Text>
             </View>
-            <Text style={styles.comingSoonDesc}>
+            <Text style={[styles.comingSoonDesc, { color: theme.colors.textSecondary }]}>
               Face ID support will be available in a future update for enhanced security and convenience.
             </Text>
             <View style={styles.comingSoonBadge}>
@@ -230,11 +232,11 @@ export default function BiometricSettingsScreen({ navigation }: Props) {
 
         {/* Info Section */}
         <View style={styles.infoSection}>
-          <View style={styles.infoCard}>
-            <Ionicons name="information-circle" size={24} color="#4A90E2" />
+          <View style={[styles.infoCard, { backgroundColor: theme.colors.surface }]}>
+            <Ionicons name="information-circle" size={24} color={theme.colors.primary} />
             <View style={styles.infoText}>
-              <Text style={styles.infoTitle}>About Fingerprint Security</Text>
-              <Text style={styles.infoDesc}>
+              <Text style={[styles.infoTitle, { color: theme.colors.text }]}>About Fingerprint Security</Text>
+              <Text style={[styles.infoDesc, { color: theme.colors.textSecondary }]}>
                 • Your fingerprint data never leaves your device{'\n'}
                 • Authentication is processed securely by your device's hardware{'\n'}
                 • You can always use your regular login as a fallback{'\n'}
@@ -264,17 +266,14 @@ export default function BiometricSettingsScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F8FF',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F0F8FF',
   },
   loadingText: {
     fontSize: 16,
-    color: '#4A90E2',
   },
   header: {
     flexDirection: 'row',
@@ -283,17 +282,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 40,
     paddingBottom: 20,
-    backgroundColor: '#F0F8FF',
   },
   backButton: {
     padding: 8,
     borderRadius: 20,
-    backgroundColor: '#E6F3FF',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#2C5282',
   },
   placeholder: {
     width: 40,
@@ -304,11 +300,9 @@ const styles = StyleSheet.create({
   },
   statusSection: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 24,
     marginBottom: 24,
-    shadowColor: '#4A90E2',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -320,13 +314,11 @@ const styles = StyleSheet.create({
   statusTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#2C5282',
     marginBottom: 8,
     textAlign: 'center',
   },
   statusDescription: {
     fontSize: 16,
-    color: '#4A90E2',
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -336,14 +328,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2C5282',
     marginBottom: 16,
   },
   settingCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
-    shadowColor: '#4A90E2',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -357,13 +346,11 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2C5282',
     marginLeft: 8,
     flex: 1,
   },
   settingDesc: {
     fontSize: 14,
-    color: '#4A90E2',
     marginBottom: 16,
     lineHeight: 20,
   },
@@ -388,12 +375,10 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   comingSoonCard: {
-    backgroundColor: '#F8F8F8',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
     opacity: 0.8,
   },
   comingSoonHeader: {
@@ -404,13 +389,11 @@ const styles = StyleSheet.create({
   comingSoonTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#B0B0B0',
     marginLeft: 8,
     flex: 1,
   },
   comingSoonDesc: {
     fontSize: 14,
-    color: '#999999',
     marginBottom: 12,
     lineHeight: 20,
   },
@@ -432,7 +415,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   infoCard: {
-    backgroundColor: '#E6F3FF',
     borderRadius: 16,
     padding: 16,
     flexDirection: 'row',
@@ -445,12 +427,10 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2C5282',
     marginBottom: 8,
   },
   infoDesc: {
     fontSize: 14,
-    color: '#4A90E2',
     lineHeight: 20,
   },
 });

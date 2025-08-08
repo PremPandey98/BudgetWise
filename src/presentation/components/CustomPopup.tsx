@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../core/theme/ThemeContext';
 
 export type PopupType = 'success' | 'error' | 'info' | 'confirm' | 'biometric-error' | 'biometric-retry' | 'warning';
 
@@ -16,6 +17,8 @@ interface Props {
 }
 
 export default function CustomPopup({ visible, message, type = 'info', onClose, onConfirm, onRetry, title, confirmText }: Props) {
+  const { theme } = useTheme();
+  
   let backgroundColor = '#4A90E2'; // default blue
   let iconName: keyof typeof Ionicons.glyphMap = 'information-circle';
   let defaultTitle = 'Info';
@@ -58,7 +61,7 @@ export default function CustomPopup({ visible, message, type = 'info', onClose, 
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={[styles.popup, { borderColor: backgroundColor }]}>
+        <View style={[styles.popup, { borderColor: backgroundColor, backgroundColor: theme.colors.card }]}>
           {/* Icon */}
           <View style={[styles.iconContainer, { backgroundColor: backgroundColor + '15' }]}>
             <Ionicons name={iconName} size={48} color={backgroundColor} />
@@ -70,7 +73,7 @@ export default function CustomPopup({ visible, message, type = 'info', onClose, 
           </Text>
           
           {/* Message */}
-          <Text style={styles.message}>{message}</Text>
+          <Text style={[styles.message, { color: theme.colors.text }]}>{message}</Text>
           
           {/* Buttons */}
           {isConfirmation ? (

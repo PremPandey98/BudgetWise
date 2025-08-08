@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BiometricService } from '../../services/BiometricService';
 import AdaptiveStatusBar from '../components/AdaptiveStatusBar';
 import CustomPopup from '../components/CustomPopup';
+import { useTheme } from '../../core/theme/ThemeContext';
 
 interface Props {
   onAuthenticated: () => void;
@@ -19,6 +20,7 @@ export default function BiometricAuthScreen({ onAuthenticated }: Props) {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const [supportedTypes, setSupportedTypes] = useState<string[]>([]);
+  const { theme } = useTheme();
   
   // Popup states
   const [showErrorPopup, setShowErrorPopup] = useState(false);
@@ -117,11 +119,11 @@ export default function BiometricAuthScreen({ onAuthenticated }: Props) {
   if (isAvailable === null) {
     // Still checking biometric availability - show loading
     return (
-      <View style={styles.container}>
-        <AdaptiveStatusBar backgroundColor="#F0F8FF" />
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <AdaptiveStatusBar backgroundColor={theme.colors.background} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4A90E2" />
-          <Text style={styles.loadingText}>Checking biometric availability...</Text>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={[styles.loadingText, { color: theme.colors.primary }]}>Checking biometric availability...</Text>
         </View>
       </View>
     );
@@ -130,46 +132,50 @@ export default function BiometricAuthScreen({ onAuthenticated }: Props) {
   if (isAvailable === false) {
     // Show loading while we handle the non-available case in useEffect
     return (
-      <View style={styles.container}>
-        <AdaptiveStatusBar backgroundColor="#F0F8FF" />
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <AdaptiveStatusBar backgroundColor={theme.colors.background} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4A90E2" />
-          <Text style={styles.loadingText}>Setting up authentication...</Text>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={[styles.loadingText, { color: theme.colors.primary }]}>Setting up authentication...</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <AdaptiveStatusBar backgroundColor="#F0F8FF" />
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <AdaptiveStatusBar backgroundColor={theme.colors.background} />
       
       {/* App Logo */}
       <View style={styles.logoContainer}>
-        <View style={styles.logoCircle}>
+        <View style={[styles.logoCircle, { backgroundColor: theme.colors.primary }]}>
           <Ionicons name="wallet" size={40} color="#FFFFFF" />
         </View>
-        <Text style={styles.appName}>BudgetWise</Text>
-        <Text style={styles.appTagline}>Secure Budget Management</Text>
+        <Text style={[styles.appName, { color: theme.colors.secondary }]}>BudgetWise</Text>
+        <Text style={[styles.appTagline, { color: theme.colors.textSecondary }]}>Secure Budget Management</Text>
       </View>
 
       {/* Biometric Section */}
       <View style={styles.biometricContainer}>
-        <View style={styles.biometricIconContainer}>
+        <View style={[styles.biometricIconContainer, { backgroundColor: theme.colors.surface }]}>
           <Ionicons 
             name={getBiometricIcon()} 
             size={80} 
-            color="#4A90E2" 
+            color={theme.colors.primary} 
           />
         </View>
         
-        <Text style={styles.biometricTitle}>Secure Authentication</Text>
-        <Text style={styles.biometricDescription}>
+        <Text style={[styles.biometricTitle, { color: theme.colors.secondary }]}>Secure Authentication</Text>
+        <Text style={[styles.biometricDescription, { color: theme.colors.textSecondary }]}>
           {getBiometricText()}
         </Text>
         {/* Authentication Button */}
         <TouchableOpacity
-          style={[styles.authButton, isAuthenticating && styles.authButtonDisabled]}
+          style={[
+            styles.authButton, 
+            { backgroundColor: theme.colors.primary },
+            isAuthenticating && [styles.authButtonDisabled, { backgroundColor: theme.colors.textSecondary }]
+          ]}
           onPress={handleBiometricAuth}
           disabled={isAuthenticating}
         >
@@ -185,9 +191,9 @@ export default function BiometricAuthScreen({ onAuthenticated }: Props) {
       </View>
 
       {/* Security Note */}
-      <View style={styles.securityNote}>
+      <View style={[styles.securityNote, { backgroundColor: theme.colors.surface }]}>
         <Ionicons name="shield-checkmark" size={16} color="#3ED598" />
-        <Text style={styles.securityText}>
+        <Text style={[styles.securityText, { color: theme.colors.textSecondary }]}>
           Biometric authentication is required for enhanced security
         </Text>
       </View>
@@ -217,7 +223,6 @@ export default function BiometricAuthScreen({ onAuthenticated }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F8FF',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
@@ -230,7 +235,6 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#4A90E2',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -238,12 +242,10 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#2C5282',
     marginBottom: 4,
   },
   appTagline: {
     fontSize: 16,
-    color: '#4A90E2',
   },
   biometricContainer: {
     alignItems: 'center',
@@ -254,7 +256,6 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#E6F3FF',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
@@ -262,13 +263,11 @@ const styles = StyleSheet.create({
   biometricTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#2C5282',
     marginBottom: 12,
     textAlign: 'center',
   },
   biometricDescription: {
     fontSize: 16,
-    color: '#4A90E2',
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 16,
@@ -281,7 +280,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   authButton: {
-    backgroundColor: '#4A90E2',
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 32,
@@ -292,7 +290,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   authButtonDisabled: {
-    backgroundColor: '#A0C4E8',
+    // Background color now handled inline with theme
   },
   authButtonText: {
     color: '#FFFFFF',
@@ -303,14 +301,12 @@ const styles = StyleSheet.create({
   securityNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E6F7F1',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
     marginTop: 40,
   },
   securityText: {
-    color: '#2D7D5E',
     fontSize: 14,
     marginLeft: 8,
     textAlign: 'center',
@@ -321,7 +317,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: '#4A90E2',
     fontSize: 16,
     marginTop: 16,
     textAlign: 'center',

@@ -10,30 +10,37 @@ import AppLoadingScreen from '../screens/AppLoadingScreen';
 import HomeScreen from '../screens/HomeScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
+import EmailVerificationScreen from '../screens/EmailVerificationScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
 import AddExpenseScreen from '../screens/AddExpenseScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import ViewGroupScreen from '../screens/ViewGroupScreen';
-import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
 import BiometricSettingsScreen from '../screens/BiometricSettingsScreen';
 import BiometricAuthScreen from '../screens/BiometricAuthScreen';
 import MainTabNavigator from './MainTabNavigator';
 import AdaptiveStatusBar from '../components/AdaptiveStatusBar';
 import { BiometricService } from '../../services/BiometricService';
+import { TokenRecoveryUtils } from '../../utils/tokenRecovery';
 
 export type RootStackParamList = {
   Home: undefined;
   Login: undefined;
-  Register: undefined;
+  Register: { email?: string; verified?: boolean } | undefined;
+  EmailVerification: { email: string; isPasswordReset?: boolean };
+  ForgotPassword: undefined;
+  ResetPassword: { email: string; otpCode: string };
   Dashboard: undefined;
   MainTabs: undefined;
   CreateGroup: undefined;
   AddExpense: undefined;
   EditProfile: undefined;
   Settings: undefined;
-  NotificationSettings: undefined;
+  PrivacyPolicy: undefined;
   BiometricSettings: undefined;
   BiometricAuth: undefined;
   ViewGroup: {
@@ -59,8 +66,24 @@ export default function AppNavigator() {
 
   const checkLoginStatus = useCallback(async () => {
     try {
+      // Check if user has valid authentication token
+      const hasValidToken = await TokenRecoveryUtils.hasValidToken();
+      
+      if (!hasValidToken) {
+        // Check if user has data but missing token
+        const { shouldPrompt, userData } = await TokenRecoveryUtils.shouldPromptReLogin();
+        
+        if (shouldPrompt) {
+          console.log('🔑 User data exists but token is missing. Clearing invalid data...');
+          await TokenRecoveryUtils.clearInvalidUserData();
+          setIsLoggedIn(false);
+          setIsLoading(false);
+          return false;
+        }
+      }
+      
       const userData = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER_DATA);
-      const loggedIn = !!userData;
+      const loggedIn = !!userData && hasValidToken;
       
       // Simulate some loading time for better UX
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -242,8 +265,8 @@ export default function AppNavigator() {
               }}
             />
             <Stack.Screen 
-              name="NotificationSettings" 
-              component={NotificationSettingsScreen}
+              name="PrivacyPolicy" 
+              component={PrivacyPolicyScreen}
               options={{
                 presentation: 'modal',
                 headerShown: false,
@@ -272,6 +295,9 @@ export default function AppNavigator() {
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen name="EmailVerification" component={EmailVerificationScreen} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+            <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
           </>
         )}
       </Stack.Navigator>

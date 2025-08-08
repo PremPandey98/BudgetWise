@@ -53,6 +53,46 @@ export const userAPI = {
     }
   },
 
+  // Send email verification OTP
+  sendEmailVerification: async (email: string): Promise<any> => {
+    try {
+      const response = await apiClient.post('/api/Auth/send-email-verification', { email });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Verify email with OTP
+  verifyEmail: async (email: string, otpCode: string): Promise<any> => {
+    try {
+      const response = await apiClient.post('/api/Auth/verify-email', { email, otpCode });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Send password reset OTP
+  sendPasswordReset: async (email: string): Promise<any> => {
+    try {
+      const response = await apiClient.post('/api/Auth/send-password-reset', { email });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Reset password with OTP
+  resetPassword: async (email: string, otpCode: string, newPassword: string): Promise<any> => {
+    try {
+      const response = await apiClient.post('/api/Auth/reset-password', { email, otpCode, newPassword });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   // Get user profile (if needed later)
   getProfile: async (token: string): Promise<User> => {
     try {
