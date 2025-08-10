@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_CONFIG } from '../../core/config/constants';
 import { userAPI } from '../../data/services/api';
@@ -23,6 +24,9 @@ import CustomPopup, { PopupType } from '../components/CustomPopup';
 import Avatar from '../components/Avatar';
 import { AvatarColorStorage } from '../../utils/AvatarColorStorage';
 import { useTheme } from '../../core/theme/ThemeContext';
+import { RootStackParamList } from '../navigation/AppNavigator';
+
+type EditProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'EditProfile'>;
 
 export default function EditProfileScreen() {
   const [name, setName] = useState('');
@@ -42,7 +46,7 @@ export default function EditProfileScreen() {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [tempAvatarColor, setTempAvatarColor] = useState<string>('');
   
-  const navigation = useNavigation();
+  const navigation = useNavigation<EditProfileScreenNavigationProp>();
 
   // Predefined avatar colors
   const avatarColors = [
@@ -375,7 +379,11 @@ export default function EditProfileScreen() {
 
           {/* Additional Profile Options */}
           <View style={styles.additionalOptions}>
-            <TouchableOpacity style={[styles.optionItem, { backgroundColor: theme.colors.card, borderColor: theme.colors.surface }]}>
+            <TouchableOpacity 
+              style={[styles.optionItem, { backgroundColor: theme.colors.card, borderColor: theme.colors.surface }]}
+              onPress={() => navigation.navigate('ChangePassword')}
+              activeOpacity={0.7}
+            >
               <View style={[styles.optionIcon, { backgroundColor: theme.colors.surface }]}>
                 <Ionicons name="lock-closed-outline" size={20} color="#FF9500" />
               </View>
@@ -383,7 +391,10 @@ export default function EditProfileScreen() {
               <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.optionItem, { backgroundColor: theme.colors.card, borderColor: theme.colors.surface }]}>
+            <TouchableOpacity 
+              style={[styles.optionItem, { backgroundColor: theme.colors.card, borderColor: theme.colors.surface }]}
+              activeOpacity={0.7}
+            >
               <View style={[styles.optionIcon, { backgroundColor: theme.colors.surface }]}>
                 <Ionicons name="shield-outline" size={20} color="#6C63FF" />
               </View>

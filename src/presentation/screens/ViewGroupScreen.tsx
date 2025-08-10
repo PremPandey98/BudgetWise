@@ -31,6 +31,8 @@ export default function ViewGroupScreen() {
   const [loading, setLoading] = useState(false);
   const [groupDetails, setGroupDetails] = useState(group);
   const [members, setMembers] = useState<any[]>([]);
+  const [userCount, setUserCount] = useState<number>(Number(group.memberCount) || 0);
+  const [userCountMessage, setUserCountMessage] = useState<string>('');
   const [isActiveGroup, setIsActiveGroup] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
@@ -38,11 +40,12 @@ export default function ViewGroupScreen() {
   const [confirmationPopup, setConfirmationPopup] = useState(false);
   const [successPopup, setSuccessPopup] = useState(false);
   const [errorPopup, setErrorPopup] = useState(false);
-  const [popupMessage, setPopupMessage] = useState('');
+  const [popupMessage, setPopupMessage] = useState<string>('');
 
   useEffect(() => {
     loadGroupDetails();
     checkIfActiveGroup();
+    fetchGroupUserCount();
   }, []);
 
   const checkIfActiveGroup = async () => {
@@ -78,6 +81,32 @@ export default function ViewGroupScreen() {
     }
   };
 
+  const fetchGroupUserCount = async () => {
+    try {
+      const userData = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER_DATA);
+      if (userData) {
+        const parsed = JSON.parse(userData);
+        const token = parsed.token;
+        
+        if (token) {
+          console.log('🔄 Fetching group user count for group:', groupDetails.id);
+          const response = await groupAPI.getGroupUserCount(groupDetails.id, token);
+          
+          if (response) {
+            setUserCount(Number(response.userCount) || 0);
+            setUserCountMessage(String(response.message || ''));
+            console.log('✅ Group user count loaded:', response);
+          }
+        }
+      }
+    } catch (error: any) {
+      console.log('❌ Error fetching group user count:', error);
+      // Keep the original member count from props if API fails
+      setUserCount(Number(groupDetails.memberCount) || 0);
+      setUserCountMessage(`Group has ${Number(groupDetails.memberCount) || 0} member(s)`);
+    }
+  };
+
   const handleRemoveFromGroup = async () => {
     setConfirmationPopup(true);
   };
@@ -94,6 +123,9 @@ export default function ViewGroupScreen() {
         // Show success message
         setPopupMessage(`Successfully switched to "${groupDetails.groupName}"`);
         setSuccessPopup(true);
+        
+        // Refresh user count after switching
+        fetchGroupUserCount();
       } else {
         throw new Error('Failed to switch to group context');
       }
@@ -195,19 +227,25 @@ export default function ViewGroupScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#2C5282" />
+      <View style={[styles.header, { backgroundColor: theme.colors.background }]}>
+        <TouchableOpacity style={[styles.backButton, { backgroundColor: theme.colors.card }]} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color={theme.colors.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Group Details</Text>
-        <View style={styles.placeholder} />
+        <Text style={[styles.headerTitle, { color: theme.colors.primary }]}>Group Details</Text>
+        <TouchableOpacity 
+          style={[styles.refreshButton, { backgroundColor: theme.colors.card }]} 
+          onPress={fetchGroupUserCount}
+          disabled={loading}
+        >
+          <Ionicons name="refresh" size={20} color={theme.colors.primary} />
+        </TouchableOpacity>
       </View>
-
+      
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Group Card */}
-        <View style={styles.groupCard}>
+        <View style={[styles.groupCard, { backgroundColor: theme.colors.card }]}>
           <View style={styles.groupHeader}>
             <View style={styles.groupIcon}>
               <Ionicons name="people" size={32} color="#FF9500" />
@@ -220,50 +258,50 @@ export default function ViewGroupScreen() {
             )}
           </View>
           
-          <Text style={styles.groupName}>{groupDetails.groupName}</Text>
-          <Text style={styles.groupCode}>Code: {groupDetails.groupCode}</Text>
+          <Text style={[styles.groupName, { color: theme.colors.primary }]}>{String(groupDetails.groupName || '')}</Text>
+          <Text style={[styles.groupCode, { color: theme.colors.secondary }]}>Code: {String(groupDetails.groupCode || '')}</Text>
           
           {groupDetails.description && (
-            <Text style={styles.groupDescription}>{groupDetails.description}</Text>
+            <Text style={[styles.groupDescription, { color: theme.colors.textSecondary }]}>{String(groupDetails.description)}</Text>
           )}
         </View>
 
         {/* Group Information */}
         <View style={styles.infoSection}>
-          <Text style={styles.sectionTitle}>Group Information</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>Group Information</Text>
           
-          <View style={styles.infoItem}>
-            <View style={styles.infoIcon}>
-              <Ionicons name="calendar-outline" size={20} color="#4A90E2" />
+          <View style={[styles.infoItem, { backgroundColor: theme.colors.card }]}>
+            <View style={[styles.infoIcon, { backgroundColor: theme.colors.surface }]}>
+              <Ionicons name="calendar-outline" size={20} color={theme.colors.secondary} />
             </View>
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Created Date</Text>
-              <Text style={styles.infoValue}>{formatDate(groupDetails.createdAt)}</Text>
+              <Text style={[styles.infoLabel, { color: theme.colors.secondary }]}>Created Date</Text>
+              <Text style={[styles.infoValue, { color: theme.colors.primary }]}>{String(formatDate(groupDetails.createdAt))}</Text>
             </View>
           </View>
 
-          <View style={styles.infoItem}>
-            <View style={styles.infoIcon}>
-              <Ionicons name="key-outline" size={20} color="#4A90E2" />
+          <View style={[styles.infoItem, { backgroundColor: theme.colors.card }]}>
+            <View style={[styles.infoIcon, { backgroundColor: theme.colors.surface }]}>
+              <Ionicons name="key-outline" size={20} color={theme.colors.secondary} />
             </View>
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Group Code</Text>
-              <Text style={styles.infoValue}>{groupDetails.groupCode}</Text>
+              <Text style={[styles.infoLabel, { color: theme.colors.secondary }]}>Group Code</Text>
+              <Text style={[styles.infoValue, { color: theme.colors.primary }]}>{String(groupDetails.groupCode || '')}</Text>
             </View>
           </View>
 
-          <View style={styles.infoItem}>
-            <View style={styles.infoIcon}>
-              <Ionicons name="lock-closed-outline" size={20} color="#4A90E2" />
+          <View style={[styles.infoItem, { backgroundColor: theme.colors.card }]}>
+            <View style={[styles.infoIcon, { backgroundColor: theme.colors.surface }]}>
+              <Ionicons name="lock-closed-outline" size={20} color={theme.colors.secondary} />
             </View>
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Password</Text>
+              <Text style={[styles.infoLabel, { color: theme.colors.secondary }]}>Password</Text>
               <View style={styles.passwordContainer}>
-                <Text style={styles.infoValue}>
-                  {groupDetails.password 
+                <Text style={[styles.infoValue, { color: theme.colors.primary }]}>
+                  {String(groupDetails.password 
                     ? (showPassword ? groupDetails.password : '••••••••')
                     : 'No password set'
-                  }
+                  )}
                 </Text>
                 {groupDetails.password && (
                   <TouchableOpacity
@@ -273,7 +311,7 @@ export default function ViewGroupScreen() {
                     <Ionicons
                       name={showPassword ? "eye-off-outline" : "eye-outline"}
                       size={20}
-                      color="#4A90E2"
+                      color={theme.colors.secondary}
                     />
                   </TouchableOpacity>
                 )}
@@ -281,21 +319,24 @@ export default function ViewGroupScreen() {
             </View>
           </View>
 
-          <View style={styles.infoItem}>
-            <View style={styles.infoIcon}>
-              <Ionicons name="people-outline" size={20} color="#4A90E2" />
+          <View style={[styles.infoItem, { backgroundColor: theme.colors.card }]}>
+            <View style={[styles.infoIcon, { backgroundColor: theme.colors.surface }]}>
+              <Ionicons name="people-outline" size={20} color={theme.colors.secondary} />
             </View>
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Members</Text>
-              <Text style={styles.infoValue}>{groupDetails.memberCount || 'N/A'}</Text>
+              <Text style={[styles.infoLabel, { color: theme.colors.secondary }]}>Members</Text>
+              <Text style={[styles.infoValue, { color: theme.colors.primary }]}>{String(userCount)}</Text>
+              {userCountMessage && typeof userCountMessage === 'string' && userCountMessage.trim() !== '' && (
+                <Text style={[styles.infoSubtext, { color: theme.colors.textSecondary }]}>{String(userCountMessage)}</Text>
+              )}
             </View>
           </View>
         </View>
 
         {/* Status Section */}
         <View style={styles.statusSection}>
-          <Text style={styles.sectionTitle}>Status</Text>
-          <View style={styles.statusCard}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>Status</Text>
+          <View style={[styles.statusCard, { backgroundColor: theme.colors.card }]}>
             <View style={styles.statusIcon}>
               <Ionicons 
                 name={isActiveGroup ? "checkmark-circle" : "radio-button-off"} 
@@ -304,10 +345,10 @@ export default function ViewGroupScreen() {
               />
             </View>
             <View style={styles.statusContent}>
-              <Text style={styles.statusLabel}>
+              <Text style={[styles.statusLabel, { color: theme.colors.primary }]}>
                 {isActiveGroup ? 'Currently Active Group' : 'Inactive Group'}
               </Text>
-              <Text style={styles.statusDescription}>
+              <Text style={[styles.statusDescription, { color: theme.colors.textSecondary }]}>
                 {isActiveGroup 
                   ? 'This is your active group. All expenses will be recorded here.'
                   : 'Switch to this group to record expenses for this group.'
@@ -316,16 +357,16 @@ export default function ViewGroupScreen() {
             </View>
             {!isActiveGroup && (
               <TouchableOpacity
-                style={styles.switchButton}
+                style={[styles.switchButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.secondary }]}
                 onPress={handleSwitchToGroup}
                 disabled={loading}
               >
                 {loading ? (
-                  <ActivityIndicator color="#4A90E2" size="small" />
+                  <ActivityIndicator color={theme.colors.secondary} size="small" />
                 ) : (
                   <>
-                    <Ionicons name="swap-horizontal" size={16} color="#4A90E2" />
-                    <Text style={styles.switchButtonText}>Switch</Text>
+                    <Ionicons name="swap-horizontal" size={16} color={theme.colors.secondary} />
+                    <Text style={[styles.switchButtonText, { color: theme.colors.secondary }]}>Switch</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -335,7 +376,7 @@ export default function ViewGroupScreen() {
 
         {/* Actions Section */}
         <View style={styles.actionsSection}>
-          <Text style={styles.sectionTitle}>Actions</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>Actions</Text>
           
           <TouchableOpacity
             style={styles.dangerButton}
@@ -362,28 +403,28 @@ export default function ViewGroupScreen() {
         onRequestClose={() => setConfirmationPopup(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.confirmationModal}>
+          <View style={[styles.confirmationModal, { backgroundColor: theme.colors.card }]}>
             <View style={styles.confirmationHeader}>
               <View style={styles.warningIconContainer}>
                 <Ionicons name="warning" size={40} color="#FF4C5E" />
               </View>
-              <Text style={styles.confirmationTitle}>Leave Group?</Text>
+              <Text style={[styles.confirmationTitle, { color: theme.colors.primary }]}>Leave Group?</Text>
             </View>
             
-            <Text style={styles.confirmationMessage}>
-              Are you sure you want to leave "{groupDetails.groupName}"?
+            <Text style={[styles.confirmationMessage, { color: theme.colors.secondary }]}>
+              Are you sure you want to leave "{String(groupDetails.groupName || '')}"?
             </Text>
             
-            <Text style={styles.confirmationWarning}>
+            <Text style={[styles.confirmationWarning, { color: theme.colors.textSecondary }]}>
               This action cannot be undone and you'll need to be re-invited to join again.
             </Text>
             
             <View style={styles.confirmationButtons}>
               <TouchableOpacity
-                style={styles.cancelButton}
+                style={[styles.cancelButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
                 onPress={() => setConfirmationPopup(false)}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={[styles.cancelButtonText, { color: theme.colors.secondary }]}>Cancel</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
@@ -410,7 +451,7 @@ export default function ViewGroupScreen() {
         onRequestClose={handleSuccessClose}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.successModal}>
+          <View style={[styles.successModal, { backgroundColor: theme.colors.card }]}>
             <View style={styles.successHeader}>
               <View style={styles.successIconContainer}>
                 <Ionicons name="checkmark-circle" size={60} color="#00C897" />
@@ -418,8 +459,8 @@ export default function ViewGroupScreen() {
               <Text style={styles.successTitle}>Success!</Text>
             </View>
             
-            <Text style={styles.successMessage}>
-              {popupMessage}
+            <Text style={[styles.successMessage, { color: theme.colors.secondary }]}>
+              {String(popupMessage || '')}
             </Text>
             
             <TouchableOpacity
@@ -440,7 +481,7 @@ export default function ViewGroupScreen() {
         onRequestClose={() => setErrorPopup(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.errorModal}>
+          <View style={[styles.errorModal, { backgroundColor: theme.colors.card }]}>
             <View style={styles.errorHeader}>
               <View style={styles.errorIconContainer}>
                 <Ionicons name="close-circle" size={60} color="#FF4C5E" />
@@ -448,8 +489,8 @@ export default function ViewGroupScreen() {
               <Text style={styles.errorTitle}>Error</Text>
             </View>
             
-            <Text style={styles.errorMessage}>
-              {popupMessage}
+            <Text style={[styles.errorMessage, { color: theme.colors.secondary }]}>
+              {String(popupMessage || '')}
             </Text>
             
             <TouchableOpacity
@@ -483,6 +524,12 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
     backgroundColor: '#FFFFFF',
+  },
+  refreshButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.9,
   },
   headerTitle: {
     fontSize: 20,
@@ -598,6 +645,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#2C5282',
+  },
+  infoSubtext: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+    fontStyle: 'italic',
   },
   passwordContainer: {
     flexDirection: 'row',

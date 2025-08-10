@@ -223,18 +223,17 @@ export class OfflineManager {
       return { success: false, message: 'Device is offline' };
     }
 
+    // Check for authentication token first
+    const token = await TokenManager.getCurrentToken();
+    if (!token) {
+      console.log('⚠️ No authentication token available for sync');
+      return { success: false, message: 'No authentication token available' };
+    }
+
     this.syncInProgress = true;
     console.log('🔄 Starting sync with server...');
 
     try {
-      const token = await TokenManager.getCurrentToken();
-      if (!token) {
-        console.log('⚠️ No authentication token available for sync');
-        // Instead of throwing error, just log and stop sync gracefully
-        this.syncInProgress = false;
-        return;
-      }
-
       const pendingOperations = await this.getPendingOperations();
       const syncProgress: SyncProgress = {
         total: pendingOperations.length,
@@ -559,6 +558,7 @@ export class OfflineManager {
         try {
           const token = await TokenManager.getCurrentToken();
           if (token) {
+            console.log('🔄 Fetching transactions using online API...');
             const [expensesResponse, depositsResponse] = await Promise.all([
               expenseAPI.getAllRelatedExpenseRecords(token),
               depositAPI.getAllRelatedDeposits(token)
@@ -578,13 +578,16 @@ export class OfflineManager {
               expenses: mergedExpenses.filter(e => !e.deleted), 
               deposits: mergedDeposits.filter(d => !d.deleted) 
             };
+          } else {
+            console.log('⚠️ No authentication token available, using offline data only');
           }
         } catch (error) {
-          console.log('⚠️ Online fetch failed, using offline data');
+          console.log('⚠️ Online fetch failed, using offline data:', error);
         }
       }
 
       // Use offline data
+      console.log('🔄 Fetching transactions using offline manager...');
       const offlineData = await this.loadOfflineData();
       return {
         expenses: (offlineData?.expenses || []).filter(e => !e.deleted),
@@ -769,6 +772,8 @@ export class OfflineManager {
             console.log('✅ Analytics data cached offline');
             
             return { success: true, expenses: expensesList, deposits: depositsList };
+          } else {
+            console.log('⚠️ No authentication token available for analytics, using offline data');
           }
         } catch (error) {
           console.log('❌ Error fetching analytics from API, falling back to offline:', error);

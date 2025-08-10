@@ -53,10 +53,11 @@ export const userAPI = {
     }
   },
 
+
   // Send email verification OTP
   sendEmailVerification: async (email: string): Promise<any> => {
     try {
-      const response = await apiClient.post('/api/Auth/send-email-verification', { email });
+      const response = await apiClient.post(API_ENDPOINTS.AUTH.SEND_EMAIL_VERIFICATION, { email });
       return response.data;
     } catch (error) {
       throw error;
@@ -66,7 +67,7 @@ export const userAPI = {
   // Verify email with OTP
   verifyEmail: async (email: string, otpCode: string): Promise<any> => {
     try {
-      const response = await apiClient.post('/api/Auth/verify-email', { email, otpCode });
+      const response = await apiClient.post(API_ENDPOINTS.AUTH.VERIFY_EMAIL, { email, otpCode });
       return response.data;
     } catch (error) {
       throw error;
@@ -76,7 +77,7 @@ export const userAPI = {
   // Send password reset OTP
   sendPasswordReset: async (email: string): Promise<any> => {
     try {
-      const response = await apiClient.post('/api/Auth/send-password-reset', { email });
+      const response = await apiClient.post(API_ENDPOINTS.AUTH.SEND_PASSWORD_RESET, { email });
       return response.data;
     } catch (error) {
       throw error;
@@ -86,7 +87,25 @@ export const userAPI = {
   // Reset password with OTP
   resetPassword: async (email: string, otpCode: string, newPassword: string): Promise<any> => {
     try {
-      const response = await apiClient.post('/api/Auth/reset-password', { email, otpCode, newPassword });
+      const response = await apiClient.post(API_ENDPOINTS.AUTH.RESET_PASSWORD, { email, otpCode, newPassword });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Change password for authenticated user
+  changePassword: async (currentPassword: string, newPassword: string, token: string): Promise<any> => {
+    try {
+      const response = await apiClient.post(
+        API_ENDPOINTS.AUTH.CHANGE_PASSWORD,
+        { currentPassword, newPassword },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       return response.data;
     } catch (error) {
       throw error;
@@ -258,6 +277,20 @@ export const groupAPI = {
   removeUserFromGroup: async (userId: string, groupId: string, token: string): Promise<any> => {
     try {
       const response = await apiClient.post(`${API_ENDPOINTS.USER.REMOVE_USER_GROUP}/${userId}/${groupId}`, {}, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Get group user count
+  getGroupUserCount: async (groupId: string, token: string): Promise<any> => {
+    try {
+      const response = await apiClient.get(`${API_ENDPOINTS.GROUP.GET_GROUP_USER_COUNT}/${groupId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

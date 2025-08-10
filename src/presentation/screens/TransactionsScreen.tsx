@@ -127,6 +127,9 @@ export default function TransactionsScreen() {
           console.log(`⚠️ No valid ID found for expense ${index}, using fallback ID`);
         }
 
+        // Use createdAt as the primary date field from API response
+        const transactionDate = expense.createdAt || expense.dateTime || expense.date || new Date().toISOString();
+
         return {
           id: expenseId,
           type: 'expense' as const,
@@ -134,8 +137,8 @@ export default function TransactionsScreen() {
           description: expense.description || 'No description',
           categoryId: expense.expenseCategoryID || expense.categoryId,
           category: getCategoryName(expense.expenseCategoryID || expense.categoryId),
-          date: expense.dateTime || expense.date || new Date().toISOString(),
-          dateTime: expense.dateTime || expense.date,
+          date: transactionDate,
+          dateTime: transactionDate,
           originalData: expense, // Store original data for updates
         };
       });
@@ -155,13 +158,16 @@ export default function TransactionsScreen() {
           console.log(`⚠️ No valid ID found for deposit ${index}, using fallback ID`);
         }
 
+        // Use createdAt as the primary date field from API response
+        const transactionDate = deposit.createdAt || deposit.dateTime || deposit.date || new Date().toISOString();
+
         return {
           id: depositId,
           type: 'deposit' as const,
           amount: deposit.amount,
           description: deposit.description || 'Deposit',
-          date: deposit.dateTime || deposit.date || new Date().toISOString(),
-          dateTime: deposit.dateTime || deposit.date,
+          date: transactionDate,
+          dateTime: transactionDate,
           originalData: deposit, // Store original data for updates
         };
       });

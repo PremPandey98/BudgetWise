@@ -22,6 +22,7 @@ import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import ViewGroupScreen from '../screens/ViewGroupScreen';
 import BiometricSettingsScreen from '../screens/BiometricSettingsScreen';
 import BiometricAuthScreen from '../screens/BiometricAuthScreen';
+import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import MainTabNavigator from './MainTabNavigator';
 import AdaptiveStatusBar from '../components/AdaptiveStatusBar';
 import { BiometricService } from '../../services/BiometricService';
@@ -30,8 +31,28 @@ import { TokenRecoveryUtils } from '../../utils/tokenRecovery';
 export type RootStackParamList = {
   Home: undefined;
   Login: undefined;
-  Register: { email?: string; verified?: boolean } | undefined;
-  EmailVerification: { email: string; isPasswordReset?: boolean };
+  Register: { 
+    email?: string; 
+    verified?: boolean;
+    name?: string;
+    username?: string;
+    password?: string;
+    confirmPassword?: string;
+    phone?: string;
+    role?: number;
+  } | undefined;
+  EmailVerification: { 
+    email: string; 
+    isPasswordReset?: boolean;
+    formData?: {
+      name?: string;
+      username?: string;
+      password?: string;
+      confirmPassword?: string;
+      phone?: string;
+      role?: number;
+    };
+  };
   ForgotPassword: undefined;
   ResetPassword: { email: string; otpCode: string };
   Dashboard: undefined;
@@ -39,6 +60,7 @@ export type RootStackParamList = {
   CreateGroup: undefined;
   AddExpense: undefined;
   EditProfile: undefined;
+  ChangePassword: undefined;
   Settings: undefined;
   PrivacyPolicy: undefined;
   BiometricSettings: undefined;
@@ -251,6 +273,14 @@ export default function AppNavigator() {
             <Stack.Screen 
               name="EditProfile" 
               component={EditProfileScreen}
+              options={{
+                presentation: 'modal',
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen 
+              name="ChangePassword" 
+              component={ChangePasswordScreen}
               options={{
                 presentation: 'modal',
                 headerShown: false,

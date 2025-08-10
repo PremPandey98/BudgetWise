@@ -47,11 +47,16 @@ function getDevBaseUrl(): string {
 // API Endpoints - Updated to match your actual backend
 export const API_ENDPOINTS = {
   AUTH: {
-    LOGIN: '/api/Auth/login',             // Your existing endpoint
-    REGISTER: '/api/User/AddUser',        // Updated to match your backend controller
-    LOGOUT: '/api/Auth/logout',           // Your existing endpoint
+    LOGIN: '/api/Auth/login',
+    REGISTER: '/api/User/AddUser',
+    LOGOUT: '/api/Auth/logout',
     REFRESH: '/api/Auth/refresh',
-    SWITCH_TO_GROUP: '/api/auth/switchTogroup', // Endpoint for switching to group context
+    SWITCH_TO_GROUP: '/api/auth/switchTogroup',
+    SEND_EMAIL_VERIFICATION: '/api/Auth/send-email-verification',
+    VERIFY_EMAIL: '/api/Auth/verify-email',
+    SEND_PASSWORD_RESET: '/api/Auth/send-password-reset',
+    RESET_PASSWORD: '/api/Auth/reset-password',
+    CHANGE_PASSWORD: '/api/Auth/change-password',
   },
   USER: {
     ADD_USER: '/api/User/AddUser',        // Your existing User endpoint
@@ -65,6 +70,7 @@ export const API_ENDPOINTS = {
   },
   GROUP: {
     ADD_GROUP: '/api/Group/AddGroup',     // Endpoint for creating new group
+    GET_GROUP_USER_COUNT: '/api/Group/GetGroupUserCount', // Endpoint for getting group user count
   },
   EXPENSE: {
     ADD_EXPENSE_RECORD: '/api/ExpenseRecords/AddExpenseRecord',  // Endpoint for adding expense records

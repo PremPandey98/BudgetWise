@@ -19,15 +19,24 @@ interface Props {
 
 export default function RegisterScreen({ navigation }: Props) {
   const route = useRoute();
-  const routeParams = route.params as { email?: string; verified?: boolean } | undefined;
+  const routeParams = route.params as { 
+    email?: string; 
+    verified?: boolean;
+    name?: string;
+    username?: string;
+    password?: string;
+    confirmPassword?: string;
+    phone?: string;
+    role?: number;
+  } | undefined;
   
-  const [name, setName] = useState('');
-  const [username, setUsername] = useState('');
+  const [name, setName] = useState(routeParams?.name || '');
+  const [username, setUsername] = useState(routeParams?.username || '');
   const [email, setEmail] = useState(routeParams?.email || '');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [role, setRole] = useState(0); // Default to User (0)
+  const [password, setPassword] = useState(routeParams?.password || '');
+  const [confirmPassword, setConfirmPassword] = useState(routeParams?.confirmPassword || '');
+  const [phone, setPhone] = useState(routeParams?.phone || '');
+  const [role, setRole] = useState(routeParams?.role || 0); // Default to User (0)
   const [loading, setLoading] = useState(false);
   const [verifyingEmail, setVerifyingEmail] = useState(false);
   const [emailVerified, setEmailVerified] = useState(routeParams?.verified || false);
@@ -106,7 +115,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
   const handleRegister = async () => {
     if (!emailVerified) {
-      await handleSendVerification();
+      showPopup('Please verify your email first', 'error');
       return;
     }
 
@@ -218,7 +227,20 @@ export default function RegisterScreen({ navigation }: Props) {
     setVerifyingEmail(true);
     try {
       await userAPI.sendEmailVerification(email.trim());
-      navigation.navigate('EmailVerification', { email: email.trim(), isPasswordReset: false });
+      // Pass all form data to preserve state
+      navigation.navigate('EmailVerification', { 
+        email: email.trim(), 
+        isPasswordReset: false,
+        // Pass all form data to preserve when coming back
+        formData: {
+          name: name.trim(),
+          username: username.trim(),
+          password,
+          confirmPassword,
+          phone: phone.trim(),
+          role
+        }
+      });
     } catch (error: any) {
       let errorMessage = 'Failed to send verification email. Please try again.';
       if (error.response?.data?.message) {
@@ -228,6 +250,12 @@ export default function RegisterScreen({ navigation }: Props) {
     } finally {
       setVerifyingEmail(false);
     }
+  };
+
+  // Helper function to check if email format is valid
+  const isValidEmailFormat = (emailText: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(emailText.trim());
   };
 
   return (
@@ -304,23 +332,47 @@ export default function RegisterScreen({ navigation }: Props) {
                   <Text style={[styles.verifiedBadge, { color: theme.colors.success || '#22c55e' }]}>✓ Verified</Text>
                 )}
               </View>
-              <TextInput
-                style={[styles.input, emailVerified && styles.inputVerified, { backgroundColor: theme.colors.inputBackground, color: theme.colors.text, borderColor: emailVerified ? (theme.colors.success || '#22c55e') : theme.colors.border }]}
-                placeholder="Enter your email"
-                placeholderTextColor={theme.colors.placeholder}
-                value={email}
-                onChangeText={(text) => {
-                  setEmail(text);
-                  if (emailVerified) setEmailVerified(false); // Reset verification if email changes
-                }}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                returnKeyType="next"
-                blurOnSubmit={false}
-                editable={!emailVerified} // Disable editing if verified
-                selectionColor={theme.colors.primary}
-                underlineColorAndroid="transparent"
-              />
+              <View style={styles.emailInputContainer}>
+                <TextInput
+                  style={[
+                    styles.emailInput, 
+                    emailVerified && styles.inputVerified, 
+                    { 
+                      backgroundColor: theme.colors.inputBackground, 
+                      color: theme.colors.text, 
+                      borderColor: emailVerified ? (theme.colors.success || '#22c55e') : theme.colors.border 
+                    }
+                  ]}
+                  placeholder="Enter your email"
+                  placeholderTextColor={theme.colors.placeholder}
+                  value={email}
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    if (emailVerified) setEmailVerified(false); // Reset verification if email changes
+                  }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  editable={!emailVerified} // Disable editing if verified
+                  selectionColor={theme.colors.primary}
+                  underlineColorAndroid="transparent"
+                />
+                {!emailVerified && isValidEmailFormat(email) && (
+                  <TouchableOpacity
+                    style={[styles.verifyButton, { backgroundColor: theme.colors.primary }]}
+                    onPress={handleSendVerification}
+                    disabled={verifyingEmail}
+                    activeOpacity={0.8}
+                  >
+                    {verifyingEmail ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.verifyButtonText}>Verify</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
             
             <View style={styles.inputContainer}>
@@ -381,17 +433,15 @@ export default function RegisterScreen({ navigation }: Props) {
             ) : null}
             
             <TouchableOpacity
-              style={[styles.registerButton, (loading || verifyingEmail) && styles.buttonDisabled, { backgroundColor: theme.colors.primary }]} 
-              onPress={emailVerified ? handleRegister : handleSendVerification}
-              disabled={loading || verifyingEmail}
+              style={[styles.registerButton, loading && styles.buttonDisabled, { backgroundColor: theme.colors.primary }]} 
+              onPress={handleRegister}
+              disabled={loading}
               activeOpacity={0.8}
             >
-              {(loading || verifyingEmail) ? (
+              {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.registerButtonText}>
-                  {emailVerified ? 'Create Account' : 'Send Verification Code'}
-                </Text>
+                <Text style={styles.registerButtonText}>Create Account</Text>
               )}
             </TouchableOpacity>
 
@@ -574,5 +624,41 @@ const styles = StyleSheet.create({
   },
   inputVerified: {
     borderWidth: 2,
+  },
+  emailInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  emailInput: {
+    flex: 1,
+    height: 50,
+    borderWidth: 2,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    fontSize: 15,
+    fontWeight: '500',
+    shadowColor: '#B3D9FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    marginRight: 10,
+  },
+  verifyButton: {
+    height: 50,
+    paddingHorizontal: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    shadowColor: '#4A90E2',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  verifyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });

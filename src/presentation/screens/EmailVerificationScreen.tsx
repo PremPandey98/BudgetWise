@@ -26,12 +26,20 @@ type EmailVerificationNavigationProp = NativeStackNavigationProp<RootStackParamL
 interface RouteParams {
   email: string;
   isPasswordReset?: boolean;
+  formData?: {
+    name?: string;
+    username?: string;
+    password?: string;
+    confirmPassword?: string;
+    phone?: string;
+    role?: number;
+  };
 }
 
 export default function EmailVerificationScreen() {
   const navigation = useNavigation<EmailVerificationNavigationProp>();
   const route = useRoute();
-  const { email, isPasswordReset = false } = route.params as RouteParams;
+  const { email, isPasswordReset = false, formData } = route.params as RouteParams;
   
   const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
@@ -68,7 +76,19 @@ export default function EmailVerificationScreen() {
       if (isPasswordReset) {
         navigation.navigate('ResetPassword', { email, otpCode: otpCode.join('') });
       } else {
-        navigation.navigate('Register', { email, verified: true });
+        // Pass back all form data along with verification status
+        navigation.navigate('Register', { 
+          email, 
+          verified: true,
+          ...(formData && {
+            name: formData.name,
+            username: formData.username,
+            password: formData.password,
+            confirmPassword: formData.confirmPassword,
+            phone: formData.phone,
+            role: formData.role
+          })
+        });
       }
     }
   };
