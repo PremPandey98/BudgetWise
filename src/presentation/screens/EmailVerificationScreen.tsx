@@ -46,6 +46,7 @@ export default function EmailVerificationScreen() {
   const [resendLoading, setResendLoading] = useState(false);
   const [timer, setTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
   const [popup, setPopup] = useState<{visible: boolean, message: string, type: PopupType}>(
     { visible: false, message: '', type: 'info' }
   );
@@ -72,7 +73,8 @@ export default function EmailVerificationScreen() {
     const currentType = popup.type;
     setPopup(p => ({ ...p, visible: false }));
     
-    if (currentType === 'success') {
+    // Only navigate on actual verification success, not on resend success
+    if (currentType === 'success' && isVerified) {
       if (isPasswordReset) {
         navigation.navigate('ResetPassword', { email, otpCode: otpCode.join('') });
       } else {
@@ -97,6 +99,11 @@ export default function EmailVerificationScreen() {
     const newOtp = [...otpCode];
     newOtp[index] = value;
     setOtpCode(newOtp);
+    
+    // Reset verification status if user starts changing OTP after verification
+    if (isVerified) {
+      setIsVerified(false);
+    }
 
     // Auto-focus next input
     if (value && index < 5) {
@@ -122,10 +129,12 @@ export default function EmailVerificationScreen() {
       if (isPasswordReset) {
         // For password reset, just validate the format and navigate to ResetPassword screen
         // The actual OTP verification will happen when setting the new password
+        setIsVerified(true);
         showPopup('Code verified! Please set your new password.', 'success');
       } else {
         // For email verification during registration
         await userAPI.verifyEmail(email, code);
+        setIsVerified(true);
         showPopup('Email verified successfully!', 'success');
       }
     } catch (error: any) {
@@ -149,10 +158,11 @@ export default function EmailVerificationScreen() {
       } else {
         await userAPI.sendEmailVerification(email);
       }
-      showPopup('Verification code sent successfully!', 'success');
+      showPopup('Verification code sent successfully! Please check your email.', 'info');
       setTimer(60);
       setCanResend(false);
       setOtpCode(['', '', '', '', '', '']);
+      setIsVerified(false); // Reset verification status when resending
     } catch (error: any) {
       let errorMessage = 'Failed to send verification code. Please try again.';
       if (error.response?.data?.message) {
@@ -252,21 +262,35 @@ export default function EmailVerificationScreen() {
         <TouchableOpacity
           style={[
             styles.verifyButton,
-            { backgroundColor: theme.colors.primary },
-            (loading || otpCode.join('').length !== 6) && styles.buttonDisabled
+            { backgroundColor: isVerified ? (theme.colors.success || '#22c55e') : theme.colors.primary },
+            (loading || (!isVerified && otpCode.join('').length !== 6)) && styles.buttonDisabled
           ]}
           onPress={handleVerifyOtp}
-          disabled={loading || otpCode.join('').length !== 6}
+          disabled={loading || (!isVerified && otpCode.join('').length !== 6)}
           activeOpacity={0.8}
         >
           {loading ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : isVerified ? (
+            <Text style={styles.verifyButtonText}>✓ Verified</Text>
           ) : (
             <Text style={styles.verifyButtonText}>
               {isPasswordReset ? 'Verify & Continue' : 'Verify Email'}
             </Text>
           )}
         </TouchableOpacity>
+
+        {/* Success Message */}
+        {isVerified && (
+          <View style={styles.successContainer}>
+            <Text style={[styles.successText, { color: theme.colors.success || '#22c55e' }]}>
+              {isPasswordReset ? 'Code Verified!' : 'Email Verified!'}
+            </Text>
+            <Text style={[styles.redirectText, { color: theme.colors.textSecondary }]}>
+              {isPasswordReset ? 'You can now set your new password.' : 'Redirecting back to registration...'}
+            </Text>
+          </View>
+        )}
 
         {/* Resend Section */}
         <View style={styles.resendContainer}>
@@ -414,5 +438,21 @@ const styles = StyleSheet.create({
   timerText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  successContainer: {
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 20,
+    paddingVertical: 20,
+  },
+  successText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  redirectText: {
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });
