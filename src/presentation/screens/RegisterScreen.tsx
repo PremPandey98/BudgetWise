@@ -260,11 +260,17 @@ export default function RegisterScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.fullContainer, { backgroundColor: theme.colors.background }]}>
-      <StatusBar backgroundColor={theme.colors.background} barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
+      <StatusBar 
+        backgroundColor={theme.colors.background} 
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+        animated={false}
+        translucent={false}
+      />
       <CustomPopup visible={popup.visible} message={popup.message} type={popup.type} onClose={closePopup} />
       <KeyboardAvoidingView 
         style={[styles.container, { backgroundColor: theme.colors.background }]} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        enabled={Platform.OS === 'ios'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <ScrollView 
@@ -272,6 +278,7 @@ export default function RegisterScreen({ navigation }: Props) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          bounces={false}
         >
         {/* Header Section with Gradient Effect */}
         <View style={[styles.headerSection, { backgroundColor: theme.colors.primary }]}>
@@ -495,10 +502,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 15,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   iconText: {
     fontSize: 35,
@@ -530,14 +537,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     paddingHorizontal: 20,
-  },formContainer: {
+  },  formContainer: {
     borderRadius: 20,
     padding: 25,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 15,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
     borderTopWidth: 3,
     borderTopColor: '#87CEEB',
   },

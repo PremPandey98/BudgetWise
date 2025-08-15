@@ -183,10 +183,16 @@ export default function EmailVerificationScreen() {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={[styles.fullContainer, { backgroundColor: theme.colors.background }]}>
-        <StatusBar backgroundColor={theme.colors.background} barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
+        <StatusBar 
+          backgroundColor={theme.colors.background} 
+          barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+          animated={false}
+          translucent={false}
+        />
         <KeyboardAvoidingView 
           style={[styles.container, { backgroundColor: theme.colors.background }]}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          enabled={Platform.OS === 'ios'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
         {/* Header */}
@@ -205,6 +211,8 @@ export default function EmailVerificationScreen() {
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          bounces={false}
+          overScrollMode="never"
         >
         {/* Icon */}
         <View style={[styles.iconContainer, { backgroundColor: theme.colors.primary + '15' }]}>
